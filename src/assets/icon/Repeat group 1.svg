@@ -1,0 +1,22 @@
+<svg width="390" height="515" viewBox="0 0 390 515" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Repeat group 1_inner" data-figma-trr="r8u2.5-0f">
+<g opacity="0.11" filter="url(#filter0_f_17980_8312)">
+<path d="M121.714 -42.0112H207.198V114.801H164.926L121.714 -42.0112Z" fill="#4AD35A"/>
+<path d="M255.107 -42.0112H169.623V114.801H211.895L255.107 -42.0112Z" fill="#4AD35A"/>
+</g>
+</g>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(219.523 -65.1549) rotate(45)"/>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(420.821 44.0001) rotate(90)"/>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(485.976 263.524) rotate(135)"/>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(376.821 464.822) rotate(-180)"/>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(157.298 529.976) rotate(-135)"/>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(-44.0001 420.821) rotate(-90)"/>
+<use xlink:href="#Repeat%20group%201_inner" transform="translate(-109.155 201.298) rotate(-45)"/>
+<defs>
+<filter id="filter0_f_17980_8312" x="104.77" y="-58.9555" width="167.281" height="190.701" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="8.47212" result="effect1_foregroundBlur_17980_8312"/>
+</filter>
+</defs>
+</svg>
