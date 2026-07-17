@@ -12,28 +12,28 @@ import { cn } from '@/src/lib/utils';
 type WarehouseTab = 'overview' | 'receive' | 'transfer' | 'locations' | 'adjust' | 'history';
 
 const TABS: { value: WarehouseTab; label: string }[] = [
-  { value: 'overview',  label: 'Overview'  },
-  { value: 'receive',   label: 'Receive'   },
-  { value: 'transfer',  label: 'Transfer'  },
+  { value: 'overview', label: 'Overview' },
+  { value: 'receive', label: 'Receive' },
+  { value: 'transfer', label: 'Transfer' },
   { value: 'locations', label: 'Locations' },
-  { value: 'adjust',    label: 'Adjust'    },
-  { value: 'history',   label: 'History'   },
+  { value: 'adjust', label: 'Adjust' },
+  { value: 'history', label: 'History' },
 ];
 
 const TAB_TITLES: Record<WarehouseTab, string> = {
-  overview:  'Warehouse',
-  receive:   'Warehouse',
-  transfer:  'Warehouse',
+  overview: 'Warehouse',
+  receive: 'Warehouse',
+  transfer: 'Warehouse',
   locations: 'Warehouse',
-  adjust:    'Warehouse',
-  history:   'Warehouse',
+  adjust: 'Warehouse',
+  history: 'Warehouse',
 };
 
 export default function WarehouseManagementPage() {
   const [activeTab, setActiveTab] = useState<WarehouseTab>('overview');
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Page title */}
       <h1 className="text-2xl font-bold text-text-default mb-4">
         {TAB_TITLES[activeTab]}
@@ -59,13 +59,13 @@ export default function WarehouseManagementPage() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'overview'  && <OverviewTab onNavigate={setActiveTab} />}
-        {activeTab === 'receive'   && <ReceiveTab />}
-        {activeTab === 'transfer'  && <TransferTab />}
+      <div>
+        {activeTab === 'overview' && <OverviewTab onNavigate={setActiveTab} />}
+        {activeTab === 'receive' && <ReceiveTab />}
+        {activeTab === 'transfer' && <TransferTab />}
         {activeTab === 'locations' && <LocationsTab />}
-        {activeTab === 'adjust'    && <AdjustTab />}
-        {activeTab === 'history'   && <HistoryTab />}
+        {activeTab === 'adjust' && <AdjustTab />}
+        {activeTab === 'history' && <HistoryTab />}
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ export default function HomeDashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {STATS.map(({ icon, value, label }) => (
           <StatCard01 key={label} icon={icon} value={value} label={label} />
         ))}
@@ -51,7 +51,7 @@ export default function HomeDashboardPage() {
 
       {/* Actions */}
       <p className="text-sm font-semibold text-text-default mb-3">Actions</p>
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         {ACTIONS.map(({ icon, label, sub, href }) => (
           <Link key={label} href={href}>
             <StatCard01 icon={icon} value={label} label={sub} textSize="text-sm" textSize2="text-xs" />
