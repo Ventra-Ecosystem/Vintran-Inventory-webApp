@@ -1,94 +1,68 @@
-import { ArrowdownIcon, IdeaIcon } from '@/src/assets/icon';
-import { HomeSubTabs } from '@/src/components/dashboard/HomeSubTabs';
+'use client';
+
+import Link from 'next/link';
+import { IdeaIcon, ArrowdownIcon } from '@/src/assets/icon';
 import { StatCard02 } from '@/src/components/ui/StatCard02';
-import { ArrowDown, ArrowDown01 } from 'lucide-react';
+
+function SectionGrid({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-5">
+      <p className="text-sm font-medium text-text-subtle mb-2">{title}</p>
+      <div className="grid grid-cols-2 bg-bg-surface py-4 px-3 rounded-2xl gap-2">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function BusinessOverviewPage() {
   return (
-    <main>
-      <HomeSubTabs />
+    <div className="w-full">
+      {/* Sub-tab pills */}
+      <div className="flex items-center gap-2 mb-6">
+        <Link href="/home/dashboard" className="px-4 py-1.5 rounded-full text-sm font-medium text-text-subtle hover:bg-bg-surface transition-colors">
+          Dashboard
+        </Link>
+        <span className="px-4 py-1.5 rounded-full bg-brand text-white text-sm font-medium">Business Overview</span>
+      </div>
 
-      <div className="bg-amber-lighter rounded-[8px] py-2 px-3 flex overflow-hidden">
+      {/* Note */}
+      <div className="flex items-start justify-between bg-amber-lighter rounded-xl px-4 py-3 mb-5 border border-yellow-200">
         <div>
-          <p className="text-black font-medium text-sm">Note</p>
-          <p className="text-gray-700 font-normal text-sm">
-            (XXXX) signifies you have no permission to view available
-            information
-          </p>
+          <p className="text-sm font-semibold text-text-default mb-0.5">Note</p>
+          <p className="text-sm text-text-subtle">(XXXX) signifies you have no permission to view available information</p>
         </div>
-        <div className="relative left-4">
-          <IdeaIcon />
-        </div>
+        <IdeaIcon width={36} className="shrink-0 ml-4" />
       </div>
 
-      <div className="my-4">
-        <div className="flex justify-end">
-          <div className="px-4 py-1.5 text-text-subtle rounded-[16px] bg-bg-surface text-xs flex w-fit">
-            Today
-            <ArrowdownIcon width={17} height={17} />
-          </div>
-        </div>
-
-        <div className="">
-          <p className="font-medium text-sm text-text-subtle mb-2">Sales</p>
-
-          <div className="grid grid-cols-2 bg-bg-surface py-4 px-3 rounded-[16px] gap-2">
-            <StatCard02 value="₦26,383" label="Total Sales" />
-            <StatCard02 value="₦26,383" label="Total Sales" />
-            <StatCard02 value="₦26,383" label="Total Sales" />
-            <StatCard02 value="₦26,383" label="Total Sales" />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <p className="font-medium text-sm text-text-subtle mb-2">
-            Income/Expense
-          </p>
-
-          <div className="grid grid-cols-2 bg-bg-surface py-4 px-3 rounded-[16px] gap-2">
-            <StatCard02
-              value="₦26,383"
-              label="Total Sales"
-              valueClassName="text-[#008360]"
-            />
-            <StatCard02
-              value="₦26,383"
-              label="Total Sales"
-              valueClassName="text-[#B72B1E]"
-            />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <p className="font-medium text-sm text-text-subtle mb-2">Debt Book</p>
-
-          <div className="grid grid-cols-2 bg-bg-surface py-4 px-3 rounded-[16px] gap-2">
-            <StatCard02
-              value="₦26,383"
-              label="Total Sales"
-              valueClassName="text-[#B72B1E]"
-            />
-            <StatCard02
-              value="₦26,383"
-              label="Total Sales"
-              valueClassName="text-[#008360]"
-            />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <p className="font-medium text-sm text-text-subtle mb-2">Debt Book</p>
-
-          <div className="grid grid-cols-2 bg-bg-surface py-4 px-3 rounded-[16px] gap-2">
-            <StatCard02 value="₦26,383" label="Total Sales" />
-            <StatCard02
-              value="₦26,383,000"
-              label="Total Sales"
-              valueClassName="text-[#008360]"
-            />
-          </div>
-        </div>
+      {/* Today filter */}
+      <div className="flex justify-end mb-4">
+        <button type="button" className="flex items-center gap-1 px-3 py-1.5 bg-bg-surface rounded-full text-xs font-medium text-text-subtle">
+          Today <ArrowdownIcon width={14} />
+        </button>
       </div>
-    </main>
+
+      <SectionGrid title="Sales">
+        <StatCard02 value="₦26,383" label="Total Sales" />
+        <StatCard02 value="₦26,383" label="Sales Profit" />
+        <StatCard02 value="₦26,383" label="Credit sale" />
+        <StatCard02 value="₦26,383" label="Discount" />
+      </SectionGrid>
+
+      <SectionGrid title="Income/Expense">
+        <StatCard02 value="₦6,383" label="Income" valueClassName="text-emerald-dark" />
+        <StatCard02 value="₦383" label="Expense" valueClassName="text-error-dark" />
+      </SectionGrid>
+
+      <SectionGrid title="Debt Book">
+        <StatCard02 value="₦383" label="Customer Credit" valueClassName="text-error-dark" />
+        <StatCard02 value="₦383" label="Balance" valueClassName="text-emerald-dark" />
+      </SectionGrid>
+
+      <SectionGrid title="Product">
+        <StatCard02 value="120" label="Product quantity" />
+        <StatCard02 value="1,200,000" label="Products value" valueClassName="text-emerald-dark" />
+      </SectionGrid>
+    </div>
   );
 }

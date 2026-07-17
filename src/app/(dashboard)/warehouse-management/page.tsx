@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { WarehouseHeader } from '@/src/components/dashboard/WarehouseHeader';
-import { SegmentedTabs } from '@/src/components/ui/SegmentedTabs';
 import { OverviewTab } from '@/src/features/warehouse/OverviewTab';
 import { ReceiveTab } from '@/src/features/warehouse/ReceiveTab';
 import { TransferTab } from '@/src/features/warehouse/TransferTab';
@@ -11,75 +9,64 @@ import { AdjustTab } from '@/src/features/warehouse/AdjustTab';
 import { HistoryTab } from '@/src/features/warehouse/HistoryTab';
 import { cn } from '@/src/lib/utils';
 
-type WarehouseTab =
-  | 'overview'
-  | 'receive'
-  | 'transfer'
-  | 'locations'
-  | 'adjust'
-  | 'history';
+type WarehouseTab = 'overview' | 'receive' | 'transfer' | 'locations' | 'adjust' | 'history';
 
-const tabOptions: { value: WarehouseTab; label: string }[] = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'receive', label: 'Receive' },
-  { value: 'transfer', label: 'Transfer' },
+const TABS: { value: WarehouseTab; label: string }[] = [
+  { value: 'overview',  label: 'Overview'  },
+  { value: 'receive',   label: 'Receive'   },
+  { value: 'transfer',  label: 'Transfer'  },
   { value: 'locations', label: 'Locations' },
-  { value: 'adjust', label: 'Adjust' },
-  { value: 'history', label: 'History' },
+  { value: 'adjust',    label: 'Adjust'    },
+  { value: 'history',   label: 'History'   },
 ];
 
-const tabTitles: Record<WarehouseTab, string> = {
-  overview: 'Warehouse',
-  receive: 'Receive stock',
-  transfer: 'Transfer stock',
-  locations: 'Locations',
-  adjust: 'Adjust stock',
-  history: 'History',
+const TAB_TITLES: Record<WarehouseTab, string> = {
+  overview:  'Warehouse',
+  receive:   'Warehouse',
+  transfer:  'Warehouse',
+  locations: 'Warehouse',
+  adjust:    'Warehouse',
+  history:   'Warehouse',
 };
 
 export default function WarehouseManagementPage() {
   const [activeTab, setActiveTab] = useState<WarehouseTab>('overview');
 
   return (
-    <main className="">
-      <WarehouseHeader title={tabTitles[activeTab]} />
+    <div className="flex flex-col h-full">
+      {/* Page title */}
+      <h1 className="text-2xl font-bold text-text-default mb-4">
+        {TAB_TITLES[activeTab]}
+      </h1>
 
-      <div className="">
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {tabOptions.map((opt) => (
-            <div key={opt.value} className="flex flex-col items-center">
-              <button
-                type="button"
-                onClick={() => setActiveTab(opt.value)}
-                className={cn(
-                  'flex-1 whitespace-nowrap rounded-lg text-sm font-medium transition-colors',
-                  activeTab === opt.value
-                    ? 'text-text-default'
-                    : 'text-text-helper'
-                )}
-              >
-                {opt.label}
-              </button>
-
-              <div
-                className={cn(
-                  'h-[2px] w-8 transition-colors mt-0.5',
-                  activeTab === opt.value ? 'bg-brand' : 'bg-transparent'
-                )}
-              ></div>
-            </div>
-          ))}
-        </div>
+      {/* Tab bar */}
+      <div className="flex items-end gap-6 border-b border-gray-200 mb-6">
+        {TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => setActiveTab(tab.value)}
+            className={cn(
+              'pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px',
+              activeTab === tab.value
+                ? 'text-text-default border-brand'
+                : 'text-text-helper border-transparent hover:text-text-subtle'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <div className="pt-5">
-        {activeTab === 'overview' && <OverviewTab onNavigate={setActiveTab} />}
-        {activeTab === 'receive' && <ReceiveTab />}
-        {activeTab === 'transfer' && <TransferTab />}
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'overview'  && <OverviewTab onNavigate={setActiveTab} />}
+        {activeTab === 'receive'   && <ReceiveTab />}
+        {activeTab === 'transfer'  && <TransferTab />}
         {activeTab === 'locations' && <LocationsTab />}
-        {activeTab === 'adjust' && <AdjustTab />}
-        {activeTab === 'history' && <HistoryTab />}
+        {activeTab === 'adjust'    && <AdjustTab />}
+        {activeTab === 'history'   && <HistoryTab />}
       </div>
-    </main>
+    </div>
   );
 }

@@ -41,3 +41,20 @@ export { default as StarIcon } from '@/src/assets/icon/star.svg';
 export { default as FilterIcon } from '@/src/assets/icon/filter.svg';
 export { default as Store02Icon } from '@/src/assets/icon/store-03.svg';
 export { default as CartIcon } from '@/src/assets/icon/shopping-cart-02.svg';
+
+// Sidenav icons
+export { default as SideHomeIcon } from '@/src/assets/icon/sidenavIcons/warehouse.svg';
+export { default as SideProductIcon } from '@/src/assets/icon/sidenavIcons/product.svg';
+export { default as SideSalesIcon } from '@/src/assets/icon/sidenavIcons/sales.svg';
+export { default as SideCustomersIcon } from '@/src/assets/icon/sidenavIcons/customers.svg';
+export { default as SideWarehouseIcon } from '@/src/assets/icon/sidenavIcons/warehouse2.svg';
+export { default as SideVerificationIcon } from '@/src/assets/icon/sidenavIcons/verification.svg';
+export { default as SideNumbersIcon } from '@/src/assets/icon/sidenavIcons/number.svg';
+export { default as SideWalletIcon } from '@/src/assets/icon/sidenavIcons/wallet.svg';
+export { default as SideInsightsIcon } from '@/src/assets/icon/sidenavIcons/insight.svg';
+export { default as SideDevelopersIcon } from '@/src/assets/icon/sidenavIcons/developers.svg';
+export { default as SideSettingsIcon } from '@/src/assets/icon/sidenavIcons/settings.svg';
+export { default as SideHelpIcon } from '@/src/assets/icon/sidenavIcons/help-center.svg';
+export { default as SideRcsIcon } from '@/src/assets/icon/sidenavIcons/rcs.svg';
+export { default as SideGiftIcon } from '@/src/assets/icon/sidenavIcons/gift.svg';
+export { default as SideAvatarIcon } from '@/src/assets/icon/sidenavIcons/Avatar.svg';

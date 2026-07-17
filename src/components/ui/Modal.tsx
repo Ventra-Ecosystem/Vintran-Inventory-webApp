@@ -21,13 +21,10 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
       />
       <div
         className={cn(
-          'fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] bg-white p-padding transition-transform duration-300 ease-in-out',
-          isOpen ? 'translate-y-0' : 'translate-y-full'
+          'fixed inset-y-0 right-0 z-50 w-full sm:w-[440px] bg-white p-padding transition-transform duration-300 ease-in-out shadow-[-10px_0_40px_rgba(0,0,0,0.1)] overflow-y-auto sm:rounded-l-[24px]',
+          isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <div className="flex justify-center pb-4">
-          <div className="w-[48px] h-1 rounded-[160px] bg-[#C5C7CA]"></div>
-        </div>
         {children}
       </div>
     </>
