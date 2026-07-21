@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
     const email = formData.get('email') as string;
 
     try {
-      // TODO: replace with real API call — send OTP/reset code to email
+      // TODO: replace with real API cal — send OTP/reset code to email
       console.log('send reset code to', email);
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
     } catch (err) {
