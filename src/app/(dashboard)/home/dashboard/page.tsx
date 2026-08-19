@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   ArrowleftdownIcon,
   ArrowRightIcon,
@@ -11,13 +12,13 @@ import {
 } from '@/src/assets/icon';
 import { StatCard01 } from '@/src/components/ui/StatCard01';
 import { TransactionItem } from '@/src/components/ui/TransactionItem';
+import { dashboardApi } from '@/src/lib/api/commerce';
+import { ApiError } from '@/src/lib/api/client';
+import { toast } from 'sonner';
 
-const STATS = [
-  { icon: <MoneyIcon width={22} />, value: '₦26,383', label: "Today's Sales" },
-  { icon: <PakageIcon width={22} />, value: '3 Items', label: 'Low Stock' },
-  { icon: <StoreIcon width={22} />, value: '2', label: 'Stores' },
-  { icon: <WareHouseIcon width={22} />, value: '₦4.2M', label: 'Stock Value' },
-];
+function fmt(n: number | null | undefined) {
+  return `₦${(n ?? 0).toLocaleString()}`;
+}
 
 const ACTIONS = [
   { icon: <WareHouseIcon width={22} />, label: 'Warehouse Set up', sub: 'Set your warehouse', href: '/warehouse-management' },
@@ -25,13 +26,32 @@ const ACTIONS = [
   { icon: <MoneyIcon width={22} />, label: 'Record Sales', sub: 'Record a sale', href: '/sales' },
 ];
 
-const ACTIVITY = [
-  { title: 'Sale #0042', sub: 'Apr 14, 2026 10:24 AM', amount: '₦392,000' },
-  { title: 'Sale #0042', sub: 'Apr 14, 2026 10:24 AM', amount: '₦392,000' },
-  { title: 'Sale #0042', sub: 'Apr 14, 2026 10:24 AM', amount: '₦392,000' },
-];
-
 export default function HomeDashboardPage() {
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const today = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    dashboardApi.getSummary({ from: today, to: today })
+      .then((res: any) => setSummary(res.data ?? null))
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status !== 403) {
+          toast.error(err.description);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stats = [
+    { icon: <MoneyIcon width={22} />, value: loading ? '…' : fmt(summary?.totalSales), label: "Today's Sales" },
+    { icon: <PakageIcon width={22} />, value: loading ? '…' : String(summary?.lowStockCount ?? 0), label: 'Low Stock' },
+    { icon: <StoreIcon width={22} />, value: loading ? '…' : fmt(summary?.stockValue), label: 'Stock Value' },
+    { icon: <WareHouseIcon width={22} />, value: loading ? '…' : fmt(summary?.salesProfit), label: 'Sales Profit' },
+  ];
+
+  const activity: any[] = summary?.recentActivity ?? [];
+
   return (
     <div className="w-full">
       {/* Sub-tab pills */}
@@ -44,7 +64,7 @@ export default function HomeDashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {STATS.map(({ icon, value, label }) => (
+        {stats.map(({ icon, value, label }) => (
           <StatCard01 key={label} icon={icon} value={value} label={label} />
         ))}
       </div>
@@ -62,21 +82,21 @@ export default function HomeDashboardPage() {
       {/* Recent activity */}
       <p className="text-sm font-semibold text-text-default mb-3">Recent activity</p>
       <div className="bg-bg-surface rounded-2xl px-4 overflow-hidden">
-        {ACTIVITY.map((item, i) => (
+        {loading ? (
+          <p className="text-text-muted text-sm text-center py-6">Loading…</p>
+        ) : activity.length === 0 ? (
+          <p className="text-text-muted text-sm text-center py-6">No recent activity</p>
+        ) : activity.slice(0, 5).map((item: any, i: number) => (
           <TransactionItem
-            key={i}
+            key={item.id ?? i}
             icon={<ArrowleftdownIcon />}
-            title={item.title}
-            subtitle={item.sub}
-            amount={item.amount}
-            showDivider={i < ACTIVITY.length - 1}
+            title={item.action ?? 'Activity'}
+            subtitle={new Date(item.occurredOnUtc).toLocaleString()}
+            amount={item.detail ?? ''}
+            showDivider={i < Math.min(activity.length, 5) - 1}
           />
         ))}
-        {/* View all */}
-        <Link
-          href="/sales"
-          className="flex items-center justify-center gap-1 py-3 text-sm font-medium text-brand border-t border-[#9B9EA31A] mt-1"
-        >
+        <Link href="/sales" className="flex items-center justify-center gap-1 py-3 text-sm font-medium text-brand border-t border-[#9B9EA31A] mt-1">
           View all <ArrowRightIcon width={16} />
         </Link>
       </div>

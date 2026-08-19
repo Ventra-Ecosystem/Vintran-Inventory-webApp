@@ -17,29 +17,13 @@ import type { Supplier } from './types';
 import { useTabBar } from '@/src/hooks/useTabBar';
 import { Dropdown } from '@/src/components/ui/Dropdown';
 import { Badge } from '@/src/components/ui/Badge';
+import { suppliersApi } from '@/src/lib/api/catalog';
+import { ApiError } from '@/src/lib/api/client';
+import { toast } from 'sonner';
 
-// TODO: replace with real API call
 const vintranUsers: Supplier[] = [
-  {
-    id: 'v1',
-    name: 'Kola Foods NG',
-    contact: 'Kolawole Ade',
-    phone: '+234 810 000 0011',
-    email: 'kola@kolafoods.ng',
-    address: 'Ibadan, Nigeria',
-    category: 'Pantry',
-    isVintran: true,
-  },
-  {
-    id: 'v2',
-    name: 'Sunrise Traders',
-    contact: 'Fatima Bello',
-    phone: '+234 802 000 0022',
-    email: 'fatima@sunrise.ng',
-    address: 'Kano, Nigeria',
-    category: 'Grains',
-    isVintran: true,
-  },
+  { id: 'v1', name: 'Kola Foods NG', contact: 'Kolawole Ade', phone: '+234 810 000 0011', email: 'kola@kolafoods.ng', address: 'Ibadan, Nigeria', category: 'Pantry', isVintran: true },
+  { id: 'v2', name: 'Sunrise Traders', contact: 'Fatima Bello', phone: '+234 802 000 0022', email: 'fatima@sunrise.ng', address: 'Kano, Nigeria', category: 'Grains', isVintran: true },
 ];
 
 type SupplierType = 'external' | 'vintran';
@@ -50,18 +34,38 @@ interface AddSupplierViewProps {
   onViewProfile: (supplier: Supplier) => void;
 }
 
-export function AddSupplierView({
-  onSaved,
-  onCancel,
-  onViewProfile,
-}: AddSupplierViewProps) {
+export function AddSupplierView({ onSaved, onCancel, onViewProfile }: AddSupplierViewProps) {
   useTabBar(false);
   const [type, setType] = useState<SupplierType>('external');
   const [vintranQuery, setVintranQuery] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const filteredVintran = vintranUsers.filter((u) =>
     u.name.toLowerCase().includes(vintranQuery.toLowerCase())
   );
+
+  const handleExternalSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const name = fd.get('name') as string;
+    if (!name?.trim()) { toast.error('Supplier name is required'); return; }
+    setSubmitting(true);
+    try {
+      await suppliersApi.create({
+        name: name.trim(),
+        contactPerson: (fd.get('contact') as string) || undefined,
+        phone: (fd.get('phone') as string) || undefined,
+        email: (fd.get('email') as string) || undefined,
+        address: (fd.get('address') as string) || undefined,
+      });
+      toast.success('Supplier added');
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.description : 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -124,11 +128,7 @@ export function AddSupplierView({
 
       {type === 'external' ? (
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            // TODO: replace with real API call
-            onSaved();
-          }}
+          onSubmit={handleExternalSubmit}
           noValidate
           className="space-y-4 pt-2"
         >
@@ -179,8 +179,8 @@ export function AddSupplierView({
           </div>
 
           <div className="flex flex-col gap-3 pt-2 pb-2">
-            <Button variant="primary" fullWidth size="lg" type="submit">
-              Save supplier
+            <Button variant="primary" fullWidth size="lg" type="submit" disabled={submitting}>
+              {submitting ? 'Saving…' : 'Save supplier'}
             </Button>
             <Button
               variant="secondary"

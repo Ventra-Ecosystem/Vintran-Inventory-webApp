@@ -6,12 +6,14 @@ import { Sidebar } from '@/src/components/dashboard/Sidebar';
 import { NotificationIcon } from '@/src/assets/icon';
 import { Menu } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { useAuthStore } from '@/src/store/authStore';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isHome = pathname.startsWith('/home');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { businessName } = useAuthStore();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white">
@@ -60,7 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {isHome ? (
               <div>
-                <h1 className="text-xl font-bold text-text-default">JT Business</h1>
+                <h1 className="text-xl font-bold text-text-default">{businessName ?? 'My Business'}</h1>
                 <p className="text-xs font-medium text-text-subtle">Admin</p>
               </div>
             ) : (

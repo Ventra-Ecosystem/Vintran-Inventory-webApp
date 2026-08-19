@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { generalSans } from './fonts/font';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'Vintran Inventory',
@@ -14,7 +15,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${generalSans.variable} h-full antialiased`}>
-      <body className="h-screen flex flex-col">{children}</body>
+      <body className="h-screen flex flex-col" suppressHydrationWarning>
+        {children}
+        <Toaster
+          position="top-center"
+          richColors
+          closeButton
+          toastOptions={{
+            style: { fontFamily: 'var(--font-general-sans, sans-serif)' },
+          }}
+        />
+      </body>
     </html>
   );
 }

@@ -24,7 +24,7 @@ export default function StoreCreatedSuccessPage() {
 
       <div className="w-full pb-6">
         <LinkButton
-          href="/home/dashboard"
+          href="/dashboard"
           variant="primary"
           size="lg"
           fullWidth

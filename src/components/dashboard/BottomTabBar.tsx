@@ -22,10 +22,10 @@ import {
 
 const tabs = [
   {
-    href: '/home/dashboard',
-    label: 'Home',
+    href: '/dashboard',
+    label: 'Dashboard',
     icon: HomeIcon,
-    matchPrefix: '/home',
+    matchPrefix: '/dashboard',
   },
   {
     href: '/product',

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function HomeIndexPage() {
-  redirect('/home/dashboard');
+export default function LegacyHomePage() {
+  redirect('/dashboard');
 }

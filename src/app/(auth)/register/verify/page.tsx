@@ -1,0 +1,133 @@
+'use client';
+
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { AuthLayout } from '@/src/components/auth/AuthLayout';
+import { OtpInput } from '@/src/components/ui/OtpInput';
+import { Button } from '@/src/components/ui/Button';
+import { authApi } from '@/src/lib/api/auth';
+import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
+
+function RegisterVerifyForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email') ?? '';
+
+  const [code, setCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [countdown, setCountdown] = useState(60);
+
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setInterval(() => setCountdown((c) => c - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [countdown]);
+
+  const handleVerify = async (otpCode: string) => {
+    if (!email) {
+      handleApiError('Email address missing. Please register again.');
+      router.push('/register');
+      return;
+    }
+
+    if (otpCode.length < 6) {
+      handleApiError('Please enter the full 6-digit verification code.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await authApi.verifyEmail({ email, code: otpCode });
+      handleApiSuccess('Email verified successfully! Please log in to your account.');
+      router.push('/login');
+    } catch (err) {
+      handleApiError(err, { fallback: 'Verification failed. Please check your OTP code.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!email || countdown > 0 || isResending) return;
+
+    setIsResending(true);
+    try {
+      await authApi.resendOtp({ email, purpose: 'EmailVerification' });
+      handleApiSuccess('A new verification code has been sent to your email.');
+      setCountdown(60);
+    } catch (err) {
+      handleApiError(err, { fallback: 'Failed to resend OTP. Please try again.' });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      title="Verify your email"
+      subtitle={`Enter the 6-digit code sent to ${email || 'your email address'}.`}
+    >
+      <div className="flex flex-col h-full justify-between py-2">
+        <div className="space-y-6 flex flex-col items-center">
+          <OtpInput
+            length={6}
+            value={code}
+            onChange={setCode}
+            onComplete={(c) => handleVerify(c)}
+            disabled={isSubmitting}
+          />
+
+          <div className="text-center text-sm text-neutral-500">
+            Didn&apos;t receive the code?{' '}
+            <button
+              type="button"
+              disabled={countdown > 0 || isResending}
+              onClick={handleResendOtp}
+              className="font-medium text-brand hover:underline disabled:opacity-50 disabled:no-underline"
+            >
+              {isResending
+                ? 'Sending…'
+                : countdown > 0
+                ? `Resend in ${countdown}s`
+                : 'Resend OTP'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-3">
+          <Button
+            type="button"
+            fullWidth
+            size="lg"
+            disabled={isSubmitting || code.length < 6}
+            onClick={() => handleVerify(code)}
+          >
+            {isSubmitting ? 'Verifying…' : 'Verify Email'}
+          </Button>
+
+          <p className="text-center text-sm text-neutral-500">
+            <Link href="/login" className="font-medium text-brand hover:underline">
+              Back to Login
+            </Link>
+          </p>
+        </div>
+      </div>
+    </AuthLayout>
+  );
+}
+
+export default function RegisterVerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen w-screen items-center justify-center bg-white text-neutral-500">
+        Loading...
+      </div>
+    }>
+      <RegisterVerifyForm />
+    </Suspense>
+  );
+}

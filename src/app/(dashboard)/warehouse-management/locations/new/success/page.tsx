@@ -8,7 +8,7 @@ export default function NewLocationSuccessPage() {
       subtitle="Your new location has been added."
       primaryAction={
         <LinkButton
-          href="/home/dashboard"
+          href="/dashboard"
           variant="primary"
           size="lg"
           fullWidth

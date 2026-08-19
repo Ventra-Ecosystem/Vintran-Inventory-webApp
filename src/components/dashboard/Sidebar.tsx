@@ -22,14 +22,16 @@ import {
   SideVerificationIcon,
   SideWalletIcon,
   SideWarehouseIcon,
+  StoreIcon,
 } from '@/src/assets/icon';
 import { X } from 'lucide-react';
 
 const MAIN_NAV = [
-  { label: 'Home', href: '/home/dashboard', Icon: SideHomeIcon },
+  { label: 'Dashboard', href: '/dashboard', Icon: SideHomeIcon },
   { label: 'Products', href: '/product', Icon: SideProductIcon, hasArrow: true },
   { label: 'Sales', href: '/sales', Icon: SideSalesIcon, hasArrow: true },
   { label: 'Customers', href: '/customer', Icon: SideCustomersIcon, hasArrow: true },
+  { label: 'Suppliers', href: '/suppliers', Icon: StoreIcon, hasArrow: true },
   { label: 'Warehouse management', href: '/warehouse-management', Icon: SideWarehouseIcon, hasArrow: true },
   { label: 'RCS', href: '/rcs', Icon: SideRcsIcon, hasArrow: true },
 ];

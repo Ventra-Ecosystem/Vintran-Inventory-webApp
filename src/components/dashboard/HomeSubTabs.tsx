@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/src/lib/utils';
 
 const subTabs = [
-  { href: '/home/dashboard', label: 'Dashboard' },
-  { href: '/home/overview', label: 'Business overview' },
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/overview', label: 'Business overview' },
 ];
 
 export function HomeSubTabs() {

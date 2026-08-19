@@ -1,4 +1,3 @@
-// src/app/(auth)/register/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -14,15 +13,17 @@ import {
   registerSchema,
   type RegisterFormValues,
 } from '@/src/components/auth/registerSchema';
+import { authApi } from '@/src/lib/api/auth';
+import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -30,16 +31,22 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsSubmitting(true);
-    setServerError(null);
 
     try {
-      // TODO: replace with real API call
-      // await api.post('/auth/register', data)
-      console.log('register payload', data);
-      router.push('/login');
+      await authApi.createAccount({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phoneNumber: data.phoneNumber || undefined,
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        referralCode: data.referralCode || undefined,
+      });
+
+      handleApiSuccess('Account created successfully! Please verify your email.');
+      router.push(`/register/verify?email=${encodeURIComponent(data.email)}`);
     } catch (err) {
-      setServerError('Something went wrong. Please try again.');
-      console.error(err);
+      handleApiError(err, { setError, fallback: 'Failed to create account. Please check your details.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -48,23 +55,23 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Create an account to continue"
-      subtitle="Sign up to get started"
+      subtitle="Sign up to manage multi-branch inventory, sales, and analytics."
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <Input
           label="First name"
-          placeholder="Enter your first name here"
+          placeholder="Enter your first name"
           error={errors.firstName?.message}
           {...register('firstName')}
         />
         <Input
           label="Last name"
-          placeholder="Enter your last name here"
+          placeholder="Enter your last name"
           error={errors.lastName?.message}
           {...register('lastName')}
         />
         <Input
-          label="Email"
+          label="Email address"
           type="email"
           placeholder="janedoe@gmail.com"
           error={errors.email?.message}
@@ -81,14 +88,14 @@ export default function RegisterPage() {
         <Input
           label="Password"
           type="password"
-          placeholder="• • • • • • • •"
+          placeholder="Minimum 6 characters"
           error={errors.password?.message}
           {...register('password')}
         />
         <Input
           label="Confirm password"
           type="password"
-          placeholder="• • • • • • • •"
+          placeholder="Re-enter your password"
           error={errors.confirmPassword?.message}
           {...register('confirmPassword')}
         />
@@ -99,8 +106,6 @@ export default function RegisterPage() {
           {...register('referralCode')}
         />
 
-        {serverError && <p className="text-sm text-red-500">{serverError}</p>}
-
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
           {isSubmitting ? 'Creating account…' : 'Create account'}
         </Button>
@@ -108,7 +113,7 @@ export default function RegisterPage() {
 
       <p className="mt-6 text-center text-sm text-neutral-500">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-brand">
+        <Link href="/login" className="font-medium text-brand hover:underline">
           Log in
         </Link>
       </p>

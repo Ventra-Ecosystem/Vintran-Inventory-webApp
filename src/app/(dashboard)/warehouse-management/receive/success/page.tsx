@@ -25,7 +25,7 @@ export default function ReceiveSuccessPage() {
         </Button>
       }
       secondaryAction={
-        <LinkButton href="/home/dashboard" variant="secondary" size="lg" fullWidth>
+        <LinkButton href="/dashboard" variant="secondary" size="lg" fullWidth>
           Proceed to dashboard
         </LinkButton>
       }
