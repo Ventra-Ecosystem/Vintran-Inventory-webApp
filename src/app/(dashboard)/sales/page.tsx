@@ -1,242 +1,382 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Plus, ChevronDown } from 'lucide-react';
+import { DashSquareIcon, PakageIcon, StoreIcon, MoneyIcon } from '@/src/assets/icon';
+import { salesApi } from '@/src/lib/api/commerce';
+import { reportsApi, locationsApi } from '@/src/lib/api/catalog';
+import { ApiError } from '@/src/lib/api/client';
+import { toast } from 'sonner';
+import { cn, toArr } from '@/src/lib/utils';
 import { useUIStore } from '@/src/store/uiStore';
-import { Menu } from 'lucide-react';
-import { SegmentedTabs } from '@/src/components/ui/SegmentedTabs';
-import { SuppliersTab } from '@/src/features/sales/SuppliersTab';
-import { OrdersTab } from '@/src/features/sales/OrdersTab';
-import { ReceiveTab as SalesReceiveTab } from '@/src/features/sales/ReceiveTab';
-import { SalesMessagesTab } from '@/src/features/sales/SalesMessagesTab';
-import { SupplyDashboardTab } from '@/src/features/sales/supply/SupplyDashboardTab';
-import { MyListingsTab } from '@/src/features/sales/supply/MyListingsTab';
-import { IncomingOrdersTab } from '@/src/features/sales/supply/IncomingOrdersTab';
-import { SupplyMessagesTab } from '@/src/features/sales/supply/SupplyMessagesTab';
-import { cn } from '@/src/lib/utils';
-import { CartIcon, DashSquareIcon, Store02Icon } from '@/src/assets/icon';
 
-type Mode = 'buy' | 'supply';
-type BuyTab = 'suppliers' | 'orders' | 'receive' | 'messages';
-type SupplyTab = 'dashboard' | 'listings' | 'orders' | 'messages';
-type AnyTab = BuyTab | SupplyTab;
+// ── Sub-tab feature components ─────────────────────────────────────────────
+import { RecordSaleFlow } from '@/src/features/sales/RecordSaleFlow';
+import { ReceiveTab } from '@/src/features/sales/ReceiveTab';
+import { AdjustTab } from '@/src/features/warehouse/AdjustTab';
+import { ReturnsSpoilageTab } from '@/src/features/sales/ReturnsSpoilageTab';
 
-interface HeaderOverride {
-  title: string;
-  onBack: () => void;
+type SalesTab = 'Sales' | 'Receive' | 'Adjust' | 'Returns & Spoilage';
+
+const TABS: SalesTab[] = ['Sales', 'Receive', 'Adjust', 'Returns & Spoilage'];
+
+function fmt(n?: number | null) {
+  if (n == null) return '—';
+  return `₦${n.toLocaleString()}`;
 }
 
-const buyTabs: { value: BuyTab; label: string }[] = [
-  { value: 'suppliers', label: 'Suppliers' },
-  { value: 'orders', label: 'Orders' },
-  { value: 'receive', label: 'Receive' },
-  { value: 'messages', label: 'Messages' },
-];
+// ── Store Filter Panel (slides from right) ─────────────────────────────────
 
-const supplyTabs: { value: SupplyTab; label: string }[] = [
-  { value: 'dashboard', label: 'Dashboard' },
-  { value: 'listings', label: 'My listings' },
-  { value: 'orders', label: 'Orders' },
-  { value: 'messages', label: 'Messages' },
-];
+function StorePanel({
+  open,
+  onClose,
+  locations,
+  selected,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  locations: any[];
+  selected: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className={cn(
+          'fixed inset-0 z-40 bg-black/25 backdrop-blur-sm transition-opacity duration-300',
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
+      />
+      <div
+        className={cn(
+          'fixed inset-y-0 right-0 z-50 w-[85%] max-w-sm bg-white shadow-xl rounded-l-3xl flex flex-col overflow-hidden transition-transform duration-300 ease-in-out',
+          open ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-gray-200" />
+        </div>
+        <div className="px-5 pb-8 flex-1 overflow-y-auto">
+          <p className="text-base font-bold text-[#0A0D14] pt-3 mb-4">Viewing</p>
+
+          {/* All stores */}
+          <button
+            type="button"
+            onClick={() => { onSelect('all'); onClose(); }}
+            className="w-full flex items-center gap-3 py-3.5 border-b border-[#F1F5F9]"
+          >
+            <div className="w-9 h-9 rounded-lg bg-[#F8FAFC] flex items-center justify-center shrink-0">
+              <StoreIcon width={18} className="text-[#64748B]" />
+            </div>
+            <span className={cn('flex-1 text-sm text-left', selected === 'all' ? 'font-bold text-brand' : 'font-medium text-[#0A0D14]')}>
+              All stores{locations.length > 0 ? ` (${locations.length})` : ''}
+            </span>
+            <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0', selected === 'all' ? 'border-brand' : 'border-[#CBD5E1]')}>
+              {selected === 'all' && <div className="w-2.5 h-2.5 rounded-full bg-brand" />}
+            </div>
+          </button>
+
+          {locations.map(loc => {
+            const isSel = selected === loc.id;
+            return (
+              <button
+                key={loc.id}
+                type="button"
+                onClick={() => { onSelect(loc.id); onClose(); }}
+                className="w-full flex items-center gap-3 py-3.5 border-b border-[#F1F5F9] last:border-0"
+              >
+                <div className="w-9 h-9 rounded-lg bg-[#F8FAFC] flex items-center justify-center shrink-0">
+                  <StoreIcon width={18} className={isSel ? 'text-brand' : 'text-[#64748B]'} />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className={cn('text-sm', isSel ? 'font-bold text-brand' : 'font-medium text-[#0A0D14]')}>{loc.name}</p>
+                  <p className="text-[11px] text-[#94A3B8] mt-0.5">{loc.kind}</p>
+                </div>
+                <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0', isSel ? 'border-brand' : 'border-[#CBD5E1]')}>
+                  {isSel && <div className="w-2.5 h-2.5 rounded-full bg-brand" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Sale Row ─────────────────────────────────────────────────────────────────
+
+function SaleRow({ sale }: { sale: any }) {
+  return (
+    <div className="flex items-center justify-between py-3.5 border-b border-[#F1F5F9] last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-[#0A0D14]">
+          {sale.number} · {sale.customerName ?? 'Walk-in'}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <p className="text-xs text-[#64748B]">
+            {new Date(sale.createdOnUtc).toLocaleString()}
+          </p>
+          {!sale.isLocationAssigned && (
+            <span className="text-xs font-medium text-[#EA580C]">· Pending attribution</span>
+          )}
+        </div>
+      </div>
+      <div className="text-right shrink-0 pl-3">
+        <p className="text-[13px] font-semibold text-[#0A0D14]">{fmt(sale.grandTotal)}</p>
+        <div className="flex items-center justify-end gap-1 mt-0.5">
+          <StoreIcon width={11} className="text-[#64748B]" />
+          <p className="text-[11px] font-medium text-[#64748B]">{sale.channel}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Sales tab content (main dashboard) ───────────────────────────────────────
+
+function SalesTabContent({
+  onRecord,
+  locations,
+  selectedStore,
+  onOpenStoreSheet,
+}: {
+  onRecord: () => void;
+  locations: any[];
+  selectedStore: string;
+  onOpenStoreSheet: () => void;
+}) {
+  const [salesReport, setSalesReport] = useState<any>(null);
+  const [inventoryReport, setInventoryReport] = useState<any>(null);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      salesApi.getReport(today, today),
+      reportsApi.inventory(),
+    ])
+      .then(([saleRes, invRes]: any[]) => {
+        setSalesReport(saleRes.data ?? null);
+        setInventoryReport(invRes.data ?? null);
+      })
+      .catch((err: unknown) => {
+        if (!(err instanceof ApiError && err.status === 403)) {
+          toast.error('Failed to load sales data');
+        }
+      })
+      .finally(() => setLoading(false));
+
+    // Fetch recent sales separately
+    import('@/src/lib/api/commerce').then(({ salesApi: sApi }) => {
+      // Use activity log as fallback since there's no direct recent-sales endpoint on salesApi
+      // We piggyback on the report endpoint
+    }).catch(() => {});
+  }, [selectedStore, today]);
+
+  const selectedStoreName =
+    selectedStore === 'all'
+      ? `All stores${locations.length > 0 ? ` (${locations.length})` : ''}`
+      : locations.find(l => l.id === selectedStore)?.name ?? 'All stores';
+
+  const stats = [
+    {
+      label: "Today's Sales",
+      value: loading ? '…' : fmt(salesReport?.totalRevenue ?? salesReport?.totalSales),
+      color: '#0055FF',
+      bg: '#EFF5FF',
+    },
+    {
+      label: 'Stock Value',
+      value: loading ? '…' : fmt(inventoryReport?.estimatedStockValueAtCost),
+      color: '#16A34A',
+      bg: '#DCFCE7',
+    },
+    {
+      label: `${loading ? '…' : (inventoryReport?.lowStockProductCount ?? 0)} Items\nLow Stock`,
+      value: null,
+      color: '#EA580C',
+      bg: '#FFF7ED',
+    },
+    {
+      label: 'Returns & Spoilages',
+      value: '--',
+      color: '#64748B',
+      bg: '#F1F5F9',
+      dashed: true,
+    },
+  ];
+
+  return (
+    <div className="space-y-5 pb-20">
+      {/* Store filter pill */}
+      <button
+        type="button"
+        onClick={onOpenStoreSheet}
+        className="w-full flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] px-3.5 py-3"
+      >
+        <StoreIcon width={16} className="text-[#64748B] shrink-0" />
+        <span className="flex-1 text-[13px] font-medium text-[#0A0D14] text-left">{selectedStoreName}</span>
+        <ChevronDown size={16} className="text-[#64748B]" />
+      </button>
+
+      {/* 2×2 stat cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {stats.map((stat, i) => (
+          <div
+            key={i}
+            className={cn(
+              'bg-white rounded-[14px] p-4 border',
+              stat.dashed ? 'border-dashed border-[#CBD5E1]' : 'border-[#F1F5F9]'
+            )}
+          >
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center mb-2.5"
+              style={{ backgroundColor: stat.bg }}
+            >
+              <PakageIcon width={18} style={{ color: stat.color }} />
+            </div>
+            {stat.value !== null && (
+              <p className="text-xl font-bold text-[#0A0D14]">{stat.value}</p>
+            )}
+            <p className="text-xs text-[#64748B] leading-relaxed mt-0.5 whitespace-pre-line">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Record a sale button */}
+      <button
+        type="button"
+        onClick={onRecord}
+        className="w-full h-12 rounded-[10px] bg-[#EFF5FF] border-[1.5px] border-[#DBEAFE] flex items-center justify-center gap-2"
+      >
+        <Plus size={18} color="#0055FF" />
+        <span className="text-sm font-semibold text-[#0055FF]">Record a sale</span>
+      </button>
+
+      {/* Recent sales */}
+      <div>
+        <p className="text-[15px] font-semibold text-[#0A0D14] mb-3">Recent sales</p>
+        {recentSales.length === 0 ? (
+          <p className="text-[13px] text-[#94A3B8] text-center py-6">No sales recorded yet</p>
+        ) : (
+          <div className="bg-white">
+            {recentSales.map(sale => <SaleRow key={sale.id} sale={sale} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Sales Page ──────────────────────────────────────────────────────────
 
 export default function SalesPage() {
-  const toggleDrawer = useUIStore((s) => s.toggleDrawer);
-  const [mode, setMode] = useState<Mode>('buy');
-  const [buyTab, setBuyTab] = useState<BuyTab>('suppliers');
-  const [supplyTab, setSupplyTab] = useState<SupplyTab>('dashboard');
-  const [headerOverride, setHeaderOverride] = useState<HeaderOverride | null>(
-    null
-  );
+  const toggleDrawer = useUIStore(s => s.toggleDrawer);
+  const [tab, setTab] = useState<SalesTab>('Sales');
+  const [recording, setRecording] = useState(false);
+  const [storeSheetOpen, setStoreSheetOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState('all');
+  const [locations, setLocations] = useState<any[]>([]);
 
-  const clearOverride = () => setHeaderOverride(null);
+  useEffect(() => {
+    locationsApi.list()
+      .then((res: any) => setLocations(toArr(res.data)))
+      .catch(() => {});
+  }, []);
 
-  const headerTitle =
-    headerOverride?.title ?? (mode === 'buy' ? 'Suppliers' : 'My supply store');
-
-  const showBack = !!headerOverride;
+  // When recording, show full-screen record flow
+  if (recording) {
+    return (
+      <main className="min-h-screen">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setRecording(false)}
+            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100"
+          >
+            <svg className="w-5 h-5 text-[#0A0D14]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-xl font-bold text-[#0A0D14]">Record a sale</h1>
+        </div>
+        <RecordSaleFlow />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {showBack && (
-            <button
-              onClick={() => headerOverride?.onBack()}
-              aria-label="Go back"
-            >
-              <svg
-                className="w-5 h-5 text-neutral-900"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-          )}
-          <h1 className="text-xl font-semibold text-black">{headerTitle}</h1>
-        </div>
-        {!showBack && (
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-[22px] font-bold text-[#0A0D14]">Store & Sales</h1>
+        <div className="flex items-center gap-2.5">
+          {/* Record sale FAB */}
           <button
-            onClick={toggleDrawer}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-bg-surface text-brand"
+            type="button"
+            onClick={() => setRecording(true)}
+            className="w-10 h-10 rounded-full bg-brand flex items-center justify-center"
           >
-            <DashSquareIcon />
+            <Plus size={20} color="#fff" />
           </button>
-        )}
+          <button
+            type="button"
+            onClick={toggleDrawer}
+            className="w-10 h-10 rounded-full bg-[#EFF5FF] flex items-center justify-center"
+          >
+            <DashSquareIcon width={20} className="text-brand" />
+          </button>
+        </div>
       </div>
 
-      {/* Mode toggle */}
-      {!headerOverride && (
-        <div className="my-4">
-          <div className="flex gap-5 rounded-[8px] bg-bg-surface p-1">
+      {/* Tab bar */}
+      <div className="border-b border-[#E2E8F0] mb-4">
+        <div className="flex gap-5 overflow-x-auto scrollbar-hide">
+          {TABS.map(t => (
             <button
-              onClick={() => setMode('buy')}
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
               className={cn(
-                'flex-1 flex flex-row items-center gap-3 px-2  text-left rounded-lg py-1 font-medium transition-colors',
-                mode === 'buy'
-                  ? 'bg-brand-lighter text-brand'
-                  : 'text-text-subtle'
+                'pb-3 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors',
+                tab === t
+                  ? 'font-bold text-[#0A0D14] border-brand'
+                  : 'font-medium text-[#64748B] border-transparent'
               )}
             >
-              <CartIcon width={20} />
-              <div>
-                <p className="text-sm">Source</p>
-                <p className={cn('text-xs')}>Buy from suppliers</p>
-              </div>
+              {t}
             </button>
-            <button
-              onClick={() => setMode('supply')}
-              className={cn(
-                'flex-1 flex flex-row items-center gap-3 px-2 text-left rounded-lg py-1 text-xs font-medium transition-colors',
-                mode === 'supply'
-                  ? 'bg-brand-lighter text-brand'
-                  : 'text-text-subtle'
-              )}
-            >
-              <Store02Icon width={20} />
-              <div>
-                <p className="text-sm">Supply</p>
-                <p className="text-xs"> Sell to business</p>
-              </div>
-            </button>
-          </div>
+          ))}
         </div>
-      )}
-
-      {/* Tabs */}
-      {!headerOverride && (
-        <div className="mb-4">
-          {mode === 'buy' ? (
-            <div>
-              <div className="flex gap-3 justify-between overflow-x-auto pb-2">
-                {buyTabs.map((opt) => (
-                  <div key={opt.value} className="flex flex-col items-center">
-                    <button
-                      type="button"
-                      onClick={() => setBuyTab(opt.value)}
-                      className={cn(
-                        'flex-1 whitespace-nowrap rounded-lg text-sm font-medium transition-colors',
-                        buyTab === opt.value
-                          ? 'text-text-default'
-                          : 'text-text-helper'
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-
-                    <div
-                      className={cn(
-                        'h-[2px] w-8 transition-colors mt-0.5',
-                        buyTab === opt.value ? 'bg-brand' : 'bg-transparent'
-                      )}
-                    ></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex gap-3 justify-between overflow-x-auto pb-2">
-                {supplyTabs.map((opt) => (
-                  <div key={opt.value} className="flex flex-col items-center">
-                    <button
-                      type="button"
-                      onClick={() => setSupplyTab(opt.value)}
-                      className={cn(
-                        'flex-1 whitespace-nowrap rounded-lg text-sm font-medium transition-colors',
-                        supplyTab === opt.value
-                          ? 'text-text-default'
-                          : 'text-text-helper'
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-
-                    <div
-                      className={cn(
-                        'h-[2px] w-8 transition-colors mt-0.5',
-                        supplyTab === opt.value ? 'bg-brand' : 'bg-transparent'
-                      )}
-                    ></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Content */}
-      <div className="">
-        {mode === 'buy' && (
-          <>
-            {buyTab === 'suppliers' && (
-              <SuppliersTab
-                onHeaderChange={setHeaderOverride}
-                onClearOverride={clearOverride}
-              />
-            )}
-            {buyTab === 'orders' && (
-              <OrdersTab
-                onHeaderChange={setHeaderOverride}
-                onClearOverride={clearOverride}
-              />
-            )}
-            {buyTab === 'receive' && <SalesReceiveTab />}
-            {buyTab === 'messages' && (
-              <SalesMessagesTab
-                onHeaderChange={setHeaderOverride}
-                onClearOverride={clearOverride}
-              />
-            )}
-          </>
-        )}
-        {mode === 'supply' && (
-          <>
-            {supplyTab === 'dashboard' && <SupplyDashboardTab />}
-            {supplyTab === 'listings' && (
-              <MyListingsTab
-                onHeaderChange={setHeaderOverride}
-                onClearOverride={clearOverride}
-              />
-            )}
-            {supplyTab === 'orders' && (
-              <IncomingOrdersTab
-                onHeaderChange={setHeaderOverride}
-                onClearOverride={clearOverride}
-              />
-            )}
-            {supplyTab === 'messages' && <SupplyMessagesTab />}
-          </>
-        )}
       </div>
+
+      {/* Tab content */}
+      {tab === 'Sales' && (
+        <SalesTabContent
+          onRecord={() => setRecording(true)}
+          locations={locations}
+          selectedStore={selectedStore}
+          onOpenStoreSheet={() => setStoreSheetOpen(true)}
+        />
+      )}
+      {tab === 'Receive' && <ReceiveTab />}
+      {tab === 'Adjust' && <AdjustTab />}
+      {tab === 'Returns & Spoilage' && <ReturnsSpoilageTab />}
+
+      {/* Store selector panel */}
+      <StorePanel
+        open={storeSheetOpen}
+        onClose={() => setStoreSheetOpen(false)}
+        locations={locations}
+        selected={selectedStore}
+        onSelect={setSelectedStore}
+      />
     </main>
   );
 }

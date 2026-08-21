@@ -10,6 +10,7 @@ import { cn } from '@/src/lib/utils';
 import { locationsApi } from '@/src/lib/api/catalog';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 type DrawerView = 'none' | 'add' | 'deactivate' | 'success';
 
@@ -60,11 +61,12 @@ export function LocationsTab() {
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
   const [capacityNotes, setCapacityNotes] = useState('');
+  const [makePrimary, setMakePrimary] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     locationsApi.list()
-      .then((res: any) => setLocations(res.data ?? []))
+      .then((res: any) => setLocations(toArr(res.data)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -90,10 +92,10 @@ export function LocationsTab() {
     if (!warehouseName.trim()) { toast.error('Warehouse name is required'); return; }
     setIsSubmitting(true);
     try {
-      const res: any = await locationsApi.createWarehouse({ name: warehouseName.trim(), address: address1 || undefined, country: country || undefined, state: state || undefined, city: city || undefined, capacityNotes: capacityNotes || undefined, makePrimary: false });
+      const res: any = await locationsApi.createWarehouse({ name: warehouseName.trim(), address: address1 || undefined, country: country || undefined, state: state || undefined, city: city || undefined, capacityNotes: capacityNotes || undefined, makePrimary });
       setLocations((prev) => [...prev, res.data]);
       toast.success('Warehouse added');
-      setWarehouseName(''); setAddress1(''); setCountry(''); setState(''); setCity(''); setCapacityNotes('');
+      setWarehouseName(''); setAddress1(''); setCountry(''); setState(''); setCity(''); setCapacityNotes(''); setMakePrimary(false);
       setDrawerView('success');
     } catch (err) {
       toast.error(err instanceof ApiError ? err.description : 'Something went wrong');
@@ -156,6 +158,20 @@ export function LocationsTab() {
               <input required={required} value={value} onChange={(e) => setter(e.target.value)} placeholder={placeholder} className="w-full h-11 rounded-[10px] border border-gray-200 px-4 text-sm text-text-default placeholder:text-text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-primary-alpha-10" />
             </div>
           ))}
+          {/* Set as primary toggle */}
+          <div className="flex items-center justify-between bg-bg-surface rounded-xl px-4 py-3.5">
+            <div>
+              <p className="text-sm font-semibold text-text-default">Set as default warehouse</p>
+              <p className="text-xs text-text-muted mt-0.5">Make this your main location for all operations</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMakePrimary(!makePrimary)}
+              className={cn('w-11 h-6 rounded-full transition-colors relative', makePrimary ? 'bg-brand' : 'bg-gray-300')}
+            >
+              <span className={cn('absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform', makePrimary ? 'translate-x-5' : 'translate-x-0.5')} />
+            </button>
+          </div>
           <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : 'Save New Warehouse'}</Button>
           <div className="flex items-start gap-3 rounded-[10px] bg-bg-surface px-3 py-3">
             <NoticeIcon width={20} className="flex-shrink-0 mt-0.5" />

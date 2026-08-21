@@ -10,6 +10,10 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   userId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  isOwner: boolean;
   hasBusiness: boolean;
   businessId: string | null;
   businessName: string | null;
@@ -28,6 +32,7 @@ interface AuthState {
     plan?: string;
   }) => void;
   setBusiness: (business: { businessId?: string; businessName?: string; plan?: string }) => void;
+  setUserProfile: (profile: { firstName?: string; lastName?: string; isOwner?: boolean; email?: string; businessId?: string; businessName?: string }) => void;
   setTwoFactorPending: (verifyToken: string) => void;
   setPermissions: (perms: string[]) => void;
   logout: () => void;
@@ -40,6 +45,10 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       userId: null,
+      firstName: null,
+      lastName: null,
+      email: null,
+      isOwner: false,
       hasBusiness: false,
       businessId: null,
       businessName: null,
@@ -73,6 +82,16 @@ export const useAuthStore = create<AuthState>()(
           plan: (business.plan as SubscriptionPlan) ?? null,
         }),
 
+      setUserProfile: (profile) =>
+        set((state) => ({
+          firstName: profile.firstName ?? state.firstName,
+          lastName: profile.lastName ?? state.lastName,
+          isOwner: profile.isOwner ?? state.isOwner,
+          email: profile.email ?? state.email,
+          businessId: profile.businessId ?? state.businessId,
+          businessName: profile.businessName ?? state.businessName,
+        })),
+
       setTwoFactorPending: (verifyToken) =>
         set({ twoFactorPending: true, verifyToken }),
 
@@ -86,6 +105,10 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           userId: null,
+          firstName: null,
+          lastName: null,
+          email: null,
+          isOwner: false,
           hasBusiness: false,
           businessId: null,
           businessName: null,
@@ -105,6 +128,10 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         userId: state.userId,
+        firstName: state.firstName,
+        lastName: state.lastName,
+        email: state.email,
+        isOwner: state.isOwner,
         hasBusiness: state.hasBusiness,
         businessId: state.businessId,
         businessName: state.businessName,

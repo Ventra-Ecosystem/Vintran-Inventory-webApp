@@ -93,6 +93,17 @@ export const stockApi = {
   rejectTransfer: (id: string, reason?: string) =>
     apiClient.post(`/api/stock/transfers/${id}/reject`, { reason }),
   getPendingTransfers: () => apiClient.get('/api/stock/transfers/pending'),
+
+  /** GET /api/stock/movements — business-wide movement feed */
+  listMovements: (params?: { kind?: string; locationId?: string; productId?: string; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.kind) qs.set('kind', params.kind);
+    if (params?.locationId) qs.set('locationId', params.locationId);
+    if (params?.productId) qs.set('productId', params.productId);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const q = qs.toString();
+    return apiClient.get(`/api/stock/movements${q ? `?${q}` : ''}`);
+  },
 };
 
 export const locationsApi = {
@@ -218,19 +229,41 @@ export const reportsApi = {
 // ─── Consumer Marketplace Listings ───────────────────────────────────────────
 
 export const marketplaceApi = {
+  /** GET /api/listings */
+  list: (params?: { includePaused?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.includePaused) qs.set('includePaused', 'true');
+    const q = qs.toString();
+    return apiClient.get(`/api/listings${q ? `?${q}` : ''}`);
+  },
+
   /** POST /api/listings */
   create: (body: {
     productId: string;
     quantity: number;
     overridePrice?: number;
     fulfillingStoreId?: string;
+    description?: string;
+    minimumOrderQuantity?: number;
+    channelIds?: string[];
   }) => apiClient.post('/api/listings', body),
 
-  /** GET /api/listings */
-  list: () => apiClient.get('/api/listings'),
+  /** POST /api/listings/bulk */
+  bulkCreate: (body: {
+    lines: { productId: string; quantity: number; overridePrice?: number; description?: string }[];
+    fulfillingStoreId: string;
+    minimumOrderQuantity?: number;
+    channelIds?: string[];
+  }) => apiClient.post('/api/listings/bulk', body),
 
   /** POST /api/listings/{id}/revalidate */
   revalidate: (id: string) => apiClient.post(`/api/listings/${id}/revalidate`),
+
+  /** POST /api/listings/{id}/pause */
+  pause: (id: string) => apiClient.post(`/api/listings/${id}/pause`),
+
+  /** POST /api/listings/{id}/resume */
+  resume: (id: string) => apiClient.post(`/api/listings/${id}/resume`),
 
   /** POST /api/listings/{id}/vintran-link */
   attachVintranLink: (id: string, body: { link: string }) =>
@@ -242,6 +275,13 @@ export const marketplaceApi = {
 
   /** DELETE /api/listings/{id} */
   delete: (id: string) => apiClient.delete(`/api/listings/${id}`),
+
+  /** GET /api/marketplace-channels */
+  listChannels: () => apiClient.get('/api/marketplace-channels'),
+
+  /** POST /api/marketplace-channels */
+  createChannel: (body: { name: string; kind: 'Marketplace' | 'Storefront' }) =>
+    apiClient.post('/api/marketplace-channels', body),
 };
 
 // ─── B2B Listings & Orders ────────────────────────────────────────────────────

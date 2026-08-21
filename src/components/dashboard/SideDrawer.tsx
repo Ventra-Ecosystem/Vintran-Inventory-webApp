@@ -1,9 +1,11 @@
 // src/components/dashboard/SideDrawer.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useUIStore } from '@/src/store/uiStore';
+import { useAuthStore } from '@/src/store/authStore';
+import { useMe } from '@/src/hooks/useMe';
 import { cn } from '@/src/lib/utils';
 import {
   AnalyticsIcon,
@@ -19,12 +21,8 @@ import {
   UserIcon2,
   WareHouseIcon,
 } from '@/src/assets/icon';
-
-// TODO: replace with real API call
-const stores = [
-  { id: '1', name: 'Main Store' },
-  { id: '2', name: 'Warehouse Outlet' },
-];
+import { locationsApi } from '@/src/lib/api/catalog';
+import { toArr } from '@/src/lib/utils';
 
 const drawerLinks = [
   {
@@ -44,6 +42,26 @@ export function SideDrawer() {
   const isOpen = useUIStore((state) => state.isDrawerOpen);
   const closeDrawer = useUIStore((state) => state.closeDrawer);
   const [isStoresExpanded, setIsStoresExpanded] = useState(false);
+  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+
+  // Load real store locations
+  useEffect(() => {
+    if (!isOpen) return;
+    locationsApi.list()
+      .then((res: any) => {
+        const locs: any[] = toArr(res.data);
+        setStores(locs.filter((l) => l.kind === 'Store' || l.kind === 'Both').map((l) => ({ id: l.id, name: l.name })));
+      })
+      .catch(() => {});
+  }, [isOpen]);
+
+  // Dynamic user & business data
+  useMe();
+  const { businessName, firstName, lastName, isOwner } = useAuthStore();
+  const displayName = firstName
+    ? `${firstName} ${lastName ?? ''}`.trim()
+    : 'User';
+  const displayRole = isOwner ? 'Business Owner' : 'Staff';
 
   return (
     <>
@@ -68,7 +86,7 @@ export function SideDrawer() {
             <BuildingIcon />
           </div>
           <div>
-            <p className="font-semibold text-xl text-black">JT Business</p>
+            <p className="font-semibold text-xl text-black">{businessName ?? 'My Business'}</p>
             <div className="text-brand flex items-center">
               <p className="text-brand font-medium text-xs">
                 Switch/Create New Business
@@ -182,10 +200,10 @@ export function SideDrawer() {
               </div>
               <div className="flex flex-col justify-between">
                 <p className="font-semibold text-base text-black">
-                  Esele Agboighale
+                  {displayName}
                 </p>
                 <p className="text-text-subtle font-medium text-xs">
-                  Business Owner
+                  {displayRole}
                 </p>
               </div>
             </div>

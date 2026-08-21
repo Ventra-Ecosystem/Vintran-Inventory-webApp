@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/src/components/ui/Input';
 import { Button } from '@/src/components/ui/Button';
 import { BackArrowIcon, NoticeIcon } from '@/src/assets/icon';
+import { locationsApi } from '@/src/lib/api/catalog';
+import { ApiError } from '@/src/lib/api/client';
+import { toast } from 'sonner';
 
 export default function NewLocationPage() {
   const router = useRouter();
@@ -14,18 +17,24 @@ export default function NewLocationPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const formData = new FormData(e.currentTarget);
-    const payload = {
-      name: formData.get('name'),
-      address: formData.get('address'),
-    };
+    const fd = new FormData(e.currentTarget);
+    const name = fd.get('name') as string;
+    if (!name?.trim()) { toast.error('Warehouse name is required'); setIsSubmitting(false); return; }
 
     try {
-      // TODO: replace with real API call
-      console.log('create warehouse payload', payload);
+      await locationsApi.createWarehouse({
+        name: name.trim(),
+        address: (fd.get('address') as string) || undefined,
+        country: (fd.get('country') as string) || undefined,
+        state: (fd.get('state') as string) || undefined,
+        city: (fd.get('city') as string) || undefined,
+        capacityNotes: (fd.get('notes') as string) || undefined,
+        makePrimary: false,
+      });
+      toast.success('Warehouse created');
       router.push('/warehouse-management/locations/new/success');
     } catch (err) {
-      console.error(err);
+      toast.error(err instanceof ApiError ? err.description : 'Something went wrong');
     } finally {
       setIsSubmitting(false);
     }

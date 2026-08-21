@@ -1,19 +1,28 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/src/components/dashboard/Sidebar';
 import { NotificationIcon } from '@/src/assets/icon';
 import { Menu } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuthStore } from '@/src/store/authStore';
+import { notificationsApi } from '@/src/lib/api/commerce';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isHome = pathname.startsWith('/home');
+  const isDashboard = pathname === '/dashboard' || pathname === '/dashboard/overview';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { businessName } = useAuthStore();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { businessName, isOwner } = useAuthStore();
+  const displayRole = isOwner ? 'Business Owner' : 'Staff';
+
+  useEffect(() => {
+    notificationsApi.getUnreadCount()
+      .then((res: any) => setUnreadCount(res.data ?? 0))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white">
@@ -60,18 +69,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu width={20} />
             </button>
 
-            {isHome ? (
+            {isDashboard ? (
               <div>
                 <h1 className="text-xl font-bold text-text-default">{businessName ?? 'My Business'}</h1>
-                <p className="text-xs font-medium text-text-subtle">Admin</p>
+                <p className="text-xs font-medium text-text-subtle">{displayRole}</p>
               </div>
             ) : (
               <div /> /* empty — page-level h1 handles the title */
             )}
           </div>
 
-          <button type="button" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-surface text-text-muted">
+          <button type="button" className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-surface text-text-muted">
             <NotificationIcon width={20} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
         </div>
 

@@ -7,6 +7,7 @@ import type { HeaderOverride } from '../types';
 import { b2bApi } from '@/src/lib/api/catalog';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 interface MyListingsTabProps {
   onHeaderChange: (o: HeaderOverride) => void;
@@ -20,7 +21,7 @@ export function MyListingsTab({ onHeaderChange, onClearOverride }: MyListingsTab
 
   useEffect(() => {
     b2bApi.getMyListings()
-      .then((res: any) => setListings(res.data ?? []))
+      .then((res: any) => setListings(toArr(res.data)))
       .catch((err: unknown) => toast.error(err instanceof ApiError ? err.description : 'Failed to load listings'))
       .finally(() => setLoading(false));
   }, []);

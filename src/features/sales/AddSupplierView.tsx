@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/src/components/ui/Input';
 import { Button } from '@/src/components/ui/Button';
+import { Modal } from '@/src/components/ui/Modal';
 import {
   ArrowRightIcon,
   CheckMarkIcon,
@@ -15,16 +16,13 @@ import {
 import { cn } from '@/src/lib/utils';
 import type { Supplier } from './types';
 import { useTabBar } from '@/src/hooks/useTabBar';
-import { Dropdown } from '@/src/components/ui/Dropdown';
 import { Badge } from '@/src/components/ui/Badge';
 import { suppliersApi } from '@/src/lib/api/catalog';
+import { businessApi } from '@/src/lib/api/auth';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
-
-const vintranUsers: Supplier[] = [
-  { id: 'v1', name: 'Kola Foods NG', contact: 'Kolawole Ade', phone: '+234 810 000 0011', email: 'kola@kolafoods.ng', address: 'Ibadan, Nigeria', category: 'Pantry', isVintran: true },
-  { id: 'v2', name: 'Sunrise Traders', contact: 'Fatima Bello', phone: '+234 802 000 0022', email: 'fatima@sunrise.ng', address: 'Kano, Nigeria', category: 'Grains', isVintran: true },
-];
+import { SuccessScreen } from '@/src/components/dashboard/SuccessScreen';
+import { toArr } from '@/src/lib/utils';
 
 type SupplierType = 'external' | 'vintran';
 
@@ -38,11 +36,32 @@ export function AddSupplierView({ onSaved, onCancel, onViewProfile }: AddSupplie
   useTabBar(false);
   const [type, setType] = useState<SupplierType>('external');
   const [vintranQuery, setVintranQuery] = useState('');
+  const [vintranUsers, setVintranUsers] = useState<Supplier[]>([]);
+  const [vintranLoading, setVintranLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [addedSupplierName, setAddedSupplierName] = useState<string | null>(null);
 
-  const filteredVintran = vintranUsers.filter((u) =>
-    u.name.toLowerCase().includes(vintranQuery.toLowerCase())
-  );
+  // Search the business directory for Vintran suppliers
+  useEffect(() => {
+    if (type !== 'vintran') return;
+    setVintranLoading(true);
+    businessApi.searchDirectory({ search: vintranQuery || undefined, limit: 20 })
+      .then((res: any) => {
+        const items: any[] = toArr(res.data);
+        setVintranUsers(items.map((b: any) => ({
+          id: b.businessId ?? b.id,
+          name: b.businessName ?? b.name,
+          contact: b.ownerName ?? '',
+          phone: b.phone ?? '',
+          email: b.email ?? '',
+          address: b.address ?? '',
+          category: b.category ?? '',
+          isVintran: true,
+        })));
+      })
+      .catch(() => {})
+      .finally(() => setVintranLoading(false));
+  }, [type, vintranQuery]);
 
   const handleExternalSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,8 +77,7 @@ export function AddSupplierView({ onSaved, onCancel, onViewProfile }: AddSupplie
         email: (fd.get('email') as string) || undefined,
         address: (fd.get('address') as string) || undefined,
       });
-      toast.success('Supplier added');
-      onSaved();
+      setAddedSupplierName(name.trim());
     } catch (err) {
       toast.error(err instanceof ApiError ? err.description : 'Something went wrong');
     } finally {
@@ -68,188 +86,183 @@ export function AddSupplierView({ onSaved, onCancel, onViewProfile }: AddSupplie
   };
 
   return (
-    <div className="space-y-4">
-      {/* Type toggle */}
-      <div className="flex gap-2 my-4 ">
-        {(['external', 'vintran'] as SupplierType[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setType(t)}
-            className={cn(
-              'flex-1 rounded-lg py-3 px-4 text-xs text-left font-semibold transition-colors',
-              type === t ? 'bg-brand-lighter text-brand' : 'text-[#6D7075]'
-            )}
-          >
-            {t === 'external' ? (
-              <div className="space-y-1">
-                <Store02Icon width={28} />
-                <p
-                  className={cn(
-                    'font-semibold text-xs',
-                    type === t ? 'text-brand-dark' : 'text-text-subtle'
-                  )}
-                >
-                  External supplier
-                </p>
-                <p
-                  className={cn(
-                    'font-medium text-[10px]',
-                    type === t ? 'text-brand-dark' : 'text-text-subtle'
-                  )}
-                >
-                  Not on vintran
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <CheckMarkIcon width={28} />
-                <p
-                  className={cn(
-                    'font-semibold text-xs',
-                    type === t ? 'text-brand-dark' : 'text-text-subtle'
-                  )}
-                >
-                  Vintran Business{' '}
-                </p>
-                <p
-                  className={cn(
-                    'font-medium text-[10px]',
-                    type === t ? 'text-brand-dark' : 'text-text-subtle'
-                  )}
-                >
-                  Verified and connected
-                </p>
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {type === 'external' ? (
-        <form
-          onSubmit={handleExternalSubmit}
-          noValidate
-          className="space-y-4 pt-2"
-        >
-          <Input
-            label="Supplier / Business name"
-            name="name"
-            required
-            placeholder="eg Techglobe business"
-          />
-          <Input
-            label="Contact person"
-            name="contact"
-            required
-            placeholder="Full name"
-          />
-          <Input
-            label="Phone"
-            name="phone"
-            type="tel"
-            required
-            placeholder="+234 000 000 0000"
-            icon={<NigeriaIcon width={24} />}
-          />
-          <Input
-            label="Email address"
-            name="email"
-            type="email"
-            required
-            placeholder="johndoe@gmail.com"
-          />
-          <Input
-            label="Address"
-            name="address"
-            required
-            placeholder="Street, city,state"
-          />
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">
-              Product category supplied
-            </label>
-
-            <Dropdown
-              options={[]}
-              onChange={() => {}}
-              value={'Select category'}
-            />
-          </div>
-
-          <div className="flex flex-col gap-3 pt-2 pb-2">
-            <Button variant="primary" fullWidth size="lg" type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save supplier'}
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              size="lg"
+    <>
+      <div className="space-y-4">
+        {/* Type toggle */}
+        <div className="flex gap-2 my-4 ">
+          {(['external', 'vintran'] as SupplierType[]).map((t) => (
+            <button
+              key={t}
               type="button"
-              onClick={onCancel}
+              onClick={() => setType(t)}
+              className={cn(
+                'flex-1 rounded-lg py-3 px-4 text-xs text-left font-semibold transition-colors',
+                type === t ? 'bg-brand-lighter text-brand' : 'text-[#6D7075]'
+              )}
             >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div className="space-y-3">
-          <div className="px-4 h-11 bg-bg-surface text-[#525866] rounded-full text-sm font-normal flex items-center gap-4">
-            <Search size={20} />
-            <input
-              value={vintranQuery}
-              onChange={(e) => setVintranQuery(e.target.value)}
-              type="text"
-              placeholder="Search suppliers..."
-              className="flex-1 flex h-full outline-0"
-            />
-          </div>
+              {t === 'external' ? (
+                <div className="space-y-1">
+                  <Store02Icon width={28} />
+                  <p
+                    className={cn(
+                      'font-semibold text-xs',
+                      type === t ? 'text-brand-dark' : 'text-text-subtle'
+                    )}
+                  >
+                    External supplier
+                  </p>
+                  <p
+                    className={cn(
+                      'font-medium text-[10px]',
+                      type === t ? 'text-brand-dark' : 'text-text-subtle'
+                    )}
+                  >
+                    Not on vintran
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <CheckMarkIcon width={28} />
+                  <p
+                    className={cn(
+                      'font-semibold text-xs',
+                      type === t ? 'text-brand-dark' : 'text-text-subtle'
+                    )}
+                  >
+                    Vintran Business{' '}
+                  </p>
+                  <p
+                    className={cn(
+                      'font-medium text-[10px]',
+                      type === t ? 'text-brand-dark' : 'text-text-subtle'
+                    )}
+                  >
+                    Verified and connected
+                  </p>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
 
-          <div className="bg-bg-surface rounded-[8px]">
-            {filteredVintran.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between border-b border-[#9B9EA34D] px-4 py-3 last:border-0"
+        {type === 'external' ? (
+          <form
+            onSubmit={handleExternalSubmit}
+            noValidate
+            className="space-y-4 pt-2"
+          >
+            <Input
+              label="Supplier / Business name"
+              name="name"
+              required
+              placeholder="eg Techglobe business"
+            />
+            <Input
+              label="Contact person"
+              name="contact"
+              required
+              placeholder="Full name"
+            />
+            <Input
+              label="Phone"
+              name="phone"
+              type="tel"
+              required
+              placeholder="+234 000 000 0000"
+              icon={<NigeriaIcon width={24} />}
+            />
+            <Input
+              label="Email address"
+              name="email"
+              type="email"
+              required
+              placeholder="johndoe@gmail.com"
+            />
+            <Input
+              label="Address"
+              name="address"
+              required
+              placeholder="Street, city, state"
+            />
+
+            <div className="flex flex-col gap-3 pt-2 pb-2">
+              <Button variant="primary" fullWidth size="lg" type="submit" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Save supplier'}
+              </Button>
+              <Button
+                variant="secondary"
+                fullWidth
+                size="lg"
+                type="button"
+                onClick={onCancel}
               >
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-brand-lighter flex items-center justify-center">
-                    <PakageIcon width={22} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-text-default">
-                      {user.name}
-                    </p>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-3">
+            <div className="px-4 h-11 bg-bg-surface text-[#525866] rounded-full text-sm font-normal flex items-center gap-4">
+              <Search size={20} />
+              <input
+                value={vintranQuery}
+                onChange={(e) => setVintranQuery(e.target.value)}
+                type="text"
+                placeholder="Search Vintran businesses..."
+                className="flex-1 flex h-full outline-0 bg-transparent"
+              />
+            </div>
+
+            <div className="bg-bg-surface rounded-[8px]">
+              {vintranLoading ? (
+                <p className="text-sm text-text-muted text-center py-6">Searching…</p>
+              ) : vintranUsers.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-6">
+                  {vintranQuery ? 'No businesses found' : 'Search for a Vintran business to connect'}
+                </p>
+              ) : vintranUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between border-b border-[#9B9EA34D] px-4 py-3 last:border-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="h-10 w-10 rounded-full bg-brand-lighter flex items-center justify-center">
+                      <PakageIcon width={22} />
+                    </div>
                     <div>
-                      <Badge
-                        style={{ backgroundColor: '#C2D6FF' }}
-                        textStyle={{ color: '#162664' }}
-                      >
-                        Electronics
-                      </Badge>
-                      <Badge
-                        style={{ backgroundColor: '#CBF5E5' }}
-                        textStyle={{ color: '#176448' }}
-                        leftIcon={<GreenCheckIcon />}
-                      >
-                        Verified
-                      </Badge>
+                      <p className="text-xs font-semibold text-text-default">{user.name}</p>
+                      <div>
+                        <Badge style={{ backgroundColor: '#CBF5E5' }} textStyle={{ color: '#176448' }} leftIcon={<GreenCheckIcon />}>Verified</Badge>
+                      </div>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => onViewProfile(user)}
+                    className="text-xs flex items-center rounded-[16px] font-medium text-white bg-brand py-1 px-1.5"
+                  >
+                    View <ArrowRightIcon width={18} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onViewProfile(user)}
-                  className="text-xs flex items-center rounded-[16px] font-medium text-white bg-brand py-1 px-1.5"
-                >
-                  View
-                  <ArrowRightIcon width={18} />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* Right-Side Drawer Success Screen */}
+      <Modal isOpen={!!addedSupplierName} onClose={onSaved}>
+        <SuccessScreen
+          standalone={false}
+          title="Supplier Added Successfully!"
+          subtitle={`${addedSupplierName} has been added to your suppliers directory`}
+          primaryAction={
+            <Button fullWidth size="lg" onClick={onSaved}>
+              Done
+            </Button>
+          }
+        />
+      </Modal>
+    </>
   );
 }

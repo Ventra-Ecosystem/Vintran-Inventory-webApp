@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { PakageIcon, StoreIcon, HomeIcon } from '@/src/assets/icon';
-
-const MOCK_ORDERS = [
-  { id: '1', number: 'PO-001', supplierName: 'Tech Solutions Ltd', status: 'Pending', total: 150000 },
-  { id: '2', number: 'PO-002', supplierName: 'Global Logistics', status: 'FullyReceived', total: 245000 },
-];
+import { purchaseOrdersApi } from '@/src/lib/api/catalog';
+import { ApiError } from '@/src/lib/api/client';
+import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 const PO_STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
   Pending: { label: 'Pending', bg: 'bg-amber-100', color: 'text-amber-600' },
@@ -18,15 +17,35 @@ const PO_STATUS_LABEL: Record<string, { label: string; bg: string; color: string
 };
 
 export function OrdersView() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'Recent' | 'Pending' | 'Received'>('Recent');
 
-  const filteredOrders = MOCK_ORDERS.filter((o) => {
+  useEffect(() => {
+    setLoading(true);
+    purchaseOrdersApi.list()
+      .then((res: any) => {
+        setOrders(toArr(res.data));
+      })
+      .catch((err: unknown) => {
+        if (!(err instanceof ApiError && err.status === 403)) {
+          toast.error('Failed to load orders');
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredOrders = orders.filter((o: any) => {
     if (filter === 'Pending' && o.status !== 'Pending') return false;
     if (filter === 'Received' && o.status !== 'FullyReceived') return false;
-    if (search && !o.number.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !(o.number ?? o.id ?? '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  const total = orders.length;
+  const received = orders.filter((o: any) => o.status === 'FullyReceived').length;
+  const pending = orders.filter((o: any) => o.status === 'Pending').length;
 
   return (
     <div className="space-y-6">
@@ -35,25 +54,21 @@ export function OrdersView() {
           <div className="w-8 h-8 rounded-lg bg-primary-alpha-10 flex items-center justify-center mb-2">
             <PakageIcon width={16} className="text-brand" />
           </div>
-          <p className="text-xl font-bold text-gray-900">{MOCK_ORDERS.length}</p>
+          <p className="text-xl font-bold text-gray-900">{total}</p>
           <p className="text-xs text-gray-500 mt-1">Total</p>
         </div>
         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
           <div className="w-8 h-8 rounded-lg bg-primary-alpha-10 flex items-center justify-center mb-2">
             <HomeIcon width={16} className="text-brand" />
           </div>
-          <p className="text-xl font-bold text-gray-900">
-            {MOCK_ORDERS.filter((o) => o.status === 'FullyReceived').length}
-          </p>
+          <p className="text-xl font-bold text-gray-900">{received}</p>
           <p className="text-xs text-gray-500 mt-1">Received</p>
         </div>
         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
           <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center mb-2">
             <StoreIcon width={16} className="text-amber-600" />
           </div>
-          <p className="text-xl font-bold text-gray-900">
-            {MOCK_ORDERS.filter((o) => o.status === 'Pending').length}
-          </p>
+          <p className="text-xl font-bold text-gray-900">{pending}</p>
           <p className="text-xs text-gray-500 mt-1">Pending</p>
         </div>
       </div>
@@ -83,30 +98,34 @@ export function OrdersView() {
         />
       </div>
 
-      {filteredOrders.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-gray-500 text-center py-8">Loading orders…</p>
+      ) : filteredOrders.length === 0 ? (
         <p className="text-sm text-gray-500 text-center py-8">No purchase orders found</p>
       ) : (
         <div className="space-y-4">
-          {filteredOrders.map((order) => {
+          {filteredOrders.map((order: any) => {
             const statusStyle = PO_STATUS_LABEL[order.status] || { label: order.status, bg: 'bg-gray-100', color: 'text-gray-500' };
             return (
               <div key={order.id} className="flex items-center justify-between p-3 -mx-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary-alpha-10 flex items-center justify-center">
                     <span className="text-xs font-bold text-brand">
-                      {order.supplierName.substring(0, 2).toUpperCase()}
+                      {(order.supplierName ?? order.number ?? '??').substring(0, 2).toUpperCase()}
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{order.number}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{order.supplierName}</p>
+                    <p className="text-sm font-bold text-gray-900">{order.number ?? order.id}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{order.supplierName ?? '—'}</p>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold mt-1 ${statusStyle.bg} ${statusStyle.color}`}>
                       {statusStyle.label}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">₦{order.total.toLocaleString()}</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {order.total != null ? `₦${order.total.toLocaleString()}` : '—'}
+                  </p>
                 </div>
               </div>
             );

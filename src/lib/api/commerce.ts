@@ -15,9 +15,10 @@ export const dashboardApi = {
 // ─── Customers ────────────────────────────────────────────────────────────────
 
 export const customersApi = {
-  list: (params?: { search?: string; page?: number; pageSize?: number }) => {
+  list: (params?: { search?: string; status?: string; page?: number; pageSize?: number }) => {
     const qs = new URLSearchParams();
     if (params?.search) qs.set('search', params.search);
+    if (params?.status) qs.set('status', params.status);
     if (params?.page) qs.set('page', String(params.page));
     if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
     const q = qs.toString();
@@ -25,6 +26,18 @@ export const customersApi = {
   },
 
   get: (id: string) => apiClient.get(`/api/customers/${id}`),
+
+  getStats: () => apiClient.get('/api/customers/stats'),
+
+  getSales: (id: string, params?: { page?: number; pageSize?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
+    const q = qs.toString();
+    return apiClient.get(`/api/customers/${id}/sales${q ? `?${q}` : ''}`);
+  },
+
+  deactivate: (id: string) => apiClient.post(`/api/customers/${id}/deactivate`),
 
   create: (
     body: {
@@ -48,6 +61,11 @@ export const customersApi = {
 
   rate: (id: string, score: number) =>
     apiClient.post(`/api/customers/${id}/rate`, { score }),
+
+  getReport: () => apiClient.get('/api/reports/customers'),
+
+  bulkImport: (body: { csv: string }, storeId: string, dryRun = false) =>
+    apiClient.post(`/api/customers/bulk?dryRun=${dryRun}`, body, { storeId }),
 };
 
 // ─── Sales ────────────────────────────────────────────────────────────────────
@@ -65,6 +83,23 @@ export const salesApi = {
     debtNarration?: string;
     benefitIdsToApply?: string[];
   }) => apiClient.post('/api/sales', body),
+
+  list: (params?: { channel?: string; pageSize?: number; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.channel) qs.set('channel', params.channel);
+    if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
+    if (params?.page) qs.set('page', String(params.page));
+    const q = qs.toString();
+    return apiClient.get(`/api/sales${q ? `?${q}` : ''}`);
+  },
+
+  get: (id: string) => apiClient.get(`/api/sales/${id}`),
+
+  assignLocation: (id: string, locationId: string) =>
+    apiClient.post(`/api/sales/${id}/assign-location`, { locationId }),
+
+  confirmDispatch: (id: string) =>
+    apiClient.post(`/api/sales/${id}/dispatch`),
 
   getReport: (from: string, to: string) =>
     apiClient.get(`/api/reports/sales?from=${from}&to=${to}`),
@@ -125,9 +160,15 @@ export const financeApi = {
 export const staffApi = {
   list: () => apiClient.get('/api/staff'),
 
+  getMember: (id: string) => apiClient.get(`/api/staff/${id}`),
+
+  getStats: () => apiClient.get('/api/staff/stats'),
+
   create: (body: Record<string, unknown>) => apiClient.post('/api/staff', body),
 
   deactivate: (id: string) => apiClient.post(`/api/staff/${id}/deactivate`),
+
+  setStatus: (id: string, status: string) => apiClient.patch(`/api/staff/${id}/status`, { status }),
 
   listRoles: () => apiClient.get('/api/roles'),
 
@@ -139,6 +180,7 @@ export const staffApi = {
 
   deleteRole: (id: string) => apiClient.delete(`/api/roles/${id}`),
 
+  // Attendance
   getAttendance: (staffId: string, params?: { from?: string; to?: string }) => {
     const qs = new URLSearchParams();
     if (params?.from) qs.set('from', params.from);
@@ -147,8 +189,54 @@ export const staffApi = {
     return apiClient.get(`/api/attendance/${staffId}${q ? `?${q}` : ''}`);
   },
 
+  getAttendanceStats: () => apiClient.get('/api/attendance/stats'),
+
+  getAttendanceSummary: (staffId: string) => apiClient.get(`/api/attendance/${staffId}/summary`),
+
+  clockIn: (staffId: string) => apiClient.post('/api/attendance/clock-in', { staffId }),
+
+  clockOut: (body: { staffId: string }) => apiClient.post('/api/attendance/clock-out', body),
+
+  // Payroll & Pay Config
+  getPayrollConfig: (staffId: string) => apiClient.get(`/api/staff/${staffId}/payroll-config`),
+
+  setupPayroll: (body: Record<string, unknown>) => apiClient.post('/api/payroll/setup', body),
+
+  updatePayroll: (body: Record<string, unknown>) => apiClient.put('/api/payroll/config', body),
+
+  getPayHistory: (staffId: string, params?: { pageSize?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
+    const q = qs.toString();
+    return apiClient.get(`/api/staff/${staffId}/pay-history${q ? `?${q}` : ''}`);
+  },
+
+  adHocPay: (body: { staffId: string; notes: string; amount?: number }) =>
+    apiClient.post('/api/staff/pay', body),
+
   runPayroll: (body: { payPeriodLabel: string; defaultHoursForHourly: number }) =>
     apiClient.post('/api/payroll/run', body),
+
+  listPayrollRuns: (params?: { pageSize?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
+    const q = qs.toString();
+    return apiClient.get(`/api/payroll/runs${q ? `?${q}` : ''}`);
+  },
+
+  getPayrollRun: (runId: string) => apiClient.get(`/api/payroll/runs/${runId}`),
+
+  adjustPayrollItem: (body: { runId: string; staffId: string; amount: number; notes: string }) =>
+    apiClient.post('/api/payroll/adjust', body),
+
+  disbursePayroll: (body: { runId: string; mode?: string }) =>
+    apiClient.post('/api/payroll/disburse', body),
+
+  schedulePayroll: (body: { runId: string; scheduledForUtc: string; mode?: string }) =>
+    apiClient.post('/api/payroll/schedule', body),
+
+  getPayslip: (runId: string, staffId: string) =>
+    apiClient.get(`/api/payroll/runs/${runId}/payslip/${staffId}`),
 
   getReport: (from: string, to: string) =>
     apiClient.get(`/api/reports/staff?from=${from}&to=${to}`),

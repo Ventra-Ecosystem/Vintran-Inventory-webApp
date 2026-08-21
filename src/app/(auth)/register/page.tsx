@@ -58,18 +58,20 @@ export default function RegisterPage() {
       subtitle="Sign up to manage multi-branch inventory, sales, and analytics."
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        <Input
-          label="First name"
-          placeholder="Enter your first name"
-          error={errors.firstName?.message}
-          {...register('firstName')}
-        />
-        <Input
-          label="Last name"
-          placeholder="Enter your last name"
-          error={errors.lastName?.message}
-          {...register('lastName')}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="First name"
+            placeholder="First name"
+            error={errors.firstName?.message}
+            {...register('firstName')}
+          />
+          <Input
+            label="Last name"
+            placeholder="Last name"
+            error={errors.lastName?.message}
+            {...register('lastName')}
+          />
+        </div>
         <Input
           label="Email address"
           type="email"
@@ -77,14 +79,22 @@ export default function RegisterPage() {
           error={errors.email?.message}
           {...register('email')}
         />
-        <Input
-          label="Phone number"
-          type="tel"
-          placeholder="+234 000 000 0000"
-          icon={<NigeriaIcon />}
-          error={errors.phoneNumber?.message}
-          {...register('phoneNumber')}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Phone number"
+            type="tel"
+            placeholder="+234 000 000 0000"
+            icon={<NigeriaIcon />}
+            error={errors.phoneNumber?.message}
+            {...register('phoneNumber')}
+          />
+          <Input
+            label="Referral code (optional)"
+            placeholder="Referral code"
+            error={errors.referralCode?.message}
+            {...register('referralCode')}
+          />
+        </div>
         <Input
           label="Password"
           type="password"
@@ -98,12 +108,6 @@ export default function RegisterPage() {
           placeholder="Re-enter your password"
           error={errors.confirmPassword?.message}
           {...register('confirmPassword')}
-        />
-        <Input
-          label="Referral code (optional)"
-          placeholder="Referral code"
-          error={errors.referralCode?.message}
-          {...register('referralCode')}
         />
 
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>

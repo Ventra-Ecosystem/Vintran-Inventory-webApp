@@ -102,11 +102,32 @@ export const authApi = {
     newPassword: string;
     confirmPassword: string;
   }) => apiClient.post('/api/account/change-password', body),
+
+  // ── 2FA ──────────────────────────────────────────────────────────────────
+  enable2FA: () =>
+    apiClient.post<{ email: string; expiresOnUtc: string }>('/api/auth/2fa/enable'),
+
+  confirm2FA: (body: { code: string }) =>
+    apiClient.post('/api/auth/2fa/enable/confirm', body),
+
+  disable2FA: (body: { password: string }) =>
+    apiClient.post('/api/auth/2fa/disable', body),
+
+  // ── Sessions ──────────────────────────────────────────────────────────────
+  getSessions: () =>
+    apiClient.get<{ id: string; deviceName: string; deviceType: string; ipAddress: string; lastActiveUtc: string; isCurrent: boolean }[]>('/api/sessions/mine'),
+
+  revokeSession: (id: string) => apiClient.delete(`/api/sessions/${id}`),
+
+  logoutAll: () => apiClient.post('/api/auth/logout/all'),
 };
 
 // ─── Business self-service ────────────────────────────────────────────────────
 
 export const businessApi = {
+  /** GET /api/me/business */
+  getProfile: () => apiClient.get('/api/me/business'),
+
   /** PATCH /api/me/business — owner only */
   update: (body: { address?: string; country?: string; city?: string; state?: string }) =>
     apiClient.patch('/api/me/business', body),

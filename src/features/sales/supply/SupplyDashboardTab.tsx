@@ -6,6 +6,7 @@ import { StatCard01 } from '@/src/components/ui/StatCard01';
 import { b2bApi } from '@/src/lib/api/catalog';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 function fmt(n?: number | null) {
   return `₦${(n ?? 0).toLocaleString()}`;
@@ -23,7 +24,7 @@ export function SupplyDashboardTab() {
     ]).then(([dashRes, ordersRes]: any) => {
       setDashboard(dashRes.data ?? null);
       const d = ordersRes.data;
-      setOrders(Array.isArray(d) ? d.slice(0, 5) : []);
+      setOrders(Array.isArray(d) ? d.slice(0, 5) : toArr(d).slice(0, 5));
     }).catch((err: unknown) => {
       toast.error(err instanceof ApiError ? err.description : 'Failed to load supply dashboard');
     }).finally(() => setLoading(false));

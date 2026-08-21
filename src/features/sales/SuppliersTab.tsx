@@ -12,6 +12,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { suppliersApi } from '@/src/lib/api/catalog';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 type SubView =
   | { type: 'list' }
@@ -32,7 +33,7 @@ export function SuppliersTab({ onHeaderChange, onClearOverride }: SuppliersTabPr
   useEffect(() => {
     suppliersApi.list({ search: query })
       .then((res: any) => {
-        const items: any[] = res.data ?? [];
+        const items: any[] = toArr(res.data);
         setSuppliers(items.map((s) => ({
           id: s.id,
           name: s.name,

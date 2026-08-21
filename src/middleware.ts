@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   '/no-business',
   '/onboarding',
   '/create-business',
+  '/register/verify',
 ];
 
 export function middleware(request: NextRequest) {

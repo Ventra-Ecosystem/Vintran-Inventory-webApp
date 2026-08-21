@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { generalSans } from './fonts/font';
 import { Toaster } from 'sonner';
+import { AuthProvider } from '@/src/components/auth/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Vintran Inventory',
@@ -16,7 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${generalSans.variable} h-full antialiased`}>
       <body className="h-screen flex flex-col" suppressHydrationWarning>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Toaster
           position="top-center"
           richColors

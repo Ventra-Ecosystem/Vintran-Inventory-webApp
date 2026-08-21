@@ -48,7 +48,7 @@ export default function Verify2FaPage() {
       setTokens(res.data);
       handleApiSuccess('Two-factor authentication verified successfully!');
 
-      const destination = res.data.hasBusiness ? '/dashboard' : '/no-business';
+      const destination = res.data.hasBusiness ? '/dashboard' : '/create-business';
       router.push(destination);
     } catch (err) {
       handleApiError(err, { fallback: '2FA verification failed. Please check the code.' });

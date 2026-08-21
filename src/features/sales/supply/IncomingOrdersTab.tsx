@@ -6,6 +6,7 @@ import type { HeaderOverride } from '../types';
 import { b2bApi } from '@/src/lib/api/catalog';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 type OrderFilter = 'all' | 'pending' | 'processing' | 'delivered';
 
@@ -22,8 +23,7 @@ export function IncomingOrdersTab({ onHeaderChange, onClearOverride }: IncomingO
   useEffect(() => {
     b2bApi.getIncomingOrders()
       .then((res: any) => {
-        const d = res.data;
-        setOrders(Array.isArray(d) ? d : []);
+        setOrders(toArr(res.data));
       })
       .catch((err: unknown) => toast.error(err instanceof ApiError ? err.description : 'Failed to load orders'))
       .finally(() => setLoading(false));

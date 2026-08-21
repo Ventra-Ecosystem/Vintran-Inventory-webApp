@@ -58,3 +58,11 @@ export { default as SideHelpIcon } from '@/src/assets/icon/sidenavIcons/help-cen
 export { default as SideRcsIcon } from '@/src/assets/icon/sidenavIcons/rcs.svg';
 export { default as SideGiftIcon } from '@/src/assets/icon/sidenavIcons/gift.svg';
 export { default as SideAvatarIcon } from '@/src/assets/icon/sidenavIcons/Avatar.svg';
+
+// Extra nav icons — reuse existing SVGs for new drawer sections
+export { default as SideMarketplaceIcon } from '@/src/assets/icon/shopping-cart-02.svg';
+export { default as SideFinanceIcon }     from '@/src/assets/icon/money-remove-01.svg';
+export { default as SideReportsIcon }     from '@/src/assets/icon/analytics-01.svg';
+export { default as SideStaffIcon }       from '@/src/assets/icon/user-multiple.svg';
+export { default as SideInvoiceIcon }     from '@/src/assets/icon/file-01.svg';
+export { default as SideSuppliersIcon }   from '@/src/assets/icon/store-03.svg';

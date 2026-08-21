@@ -55,7 +55,7 @@ function LoginForm() {
           ? decodeURIComponent(nextUrl)
           : responseData.tokens.hasBusiness
           ? '/dashboard'
-          : '/no-business';
+          : '/create-business';
 
         // SPA navigation without hard refresh
         router.push(destination);

@@ -21,6 +21,8 @@ export function getErrorMessage(error: unknown, fallbackMessage = 'An unexpected
         return 'Invalid request details provided. Please check your input.';
       case 401:
         return 'Session expired. Please log in again to continue.';
+      case 402:
+        return 'Subscription required. Please upgrade your business plan to access this feature.';
       case 403:
         return 'Access denied. You do not have permission to perform this action.';
       case 404:

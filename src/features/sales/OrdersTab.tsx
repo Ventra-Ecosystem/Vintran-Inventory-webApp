@@ -7,6 +7,7 @@ import type { Order, HeaderOverride } from './types';
 import { purchaseOrdersApi } from '@/src/lib/api/catalog';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
+import { toArr } from '@/src/lib/utils';
 
 type OrderFilter = 'all' | 'pending' | 'awaiting-receipt' | 'received';
 
@@ -32,7 +33,7 @@ export function OrdersTab({ onHeaderChange, onClearOverride }: OrdersTabProps) {
   useEffect(() => {
     purchaseOrdersApi.list()
       .then((res: any) => {
-        const items: any[] = res.data ?? [];
+        const items: any[] = toArr(res.data);
         setOrders(items.map((o: any) => ({
           id: o.number ?? o.id,
           supplierId: o.supplierId,
