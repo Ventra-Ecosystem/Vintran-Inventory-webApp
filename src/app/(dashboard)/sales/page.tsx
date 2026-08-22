@@ -108,9 +108,13 @@ function StorePanel({
 
 // ── Sale Row ─────────────────────────────────────────────────────────────────
 
-function SaleRow({ sale }: { sale: any }) {
+function SaleRow({ sale, onPress }: { sale: any; onPress?: () => void }) {
   return (
-    <div className="flex items-center justify-between py-3.5 border-b border-[#F1F5F9] last:border-0">
+    <button
+      type="button"
+      onClick={onPress}
+      className="w-full flex items-center justify-between py-3.5 border-b border-[#F1F5F9] last:border-0 text-left hover:bg-[#F8FAFC] transition-colors -mx-1 px-1 rounded-lg"
+    >
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-[#0A0D14]">
           {sale.number} · {sale.customerName ?? 'Walk-in'}
@@ -131,7 +135,7 @@ function SaleRow({ sale }: { sale: any }) {
           <p className="text-[11px] font-medium text-[#64748B]">{sale.channel}</p>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -160,10 +164,19 @@ function SalesTabContent({
     Promise.all([
       salesApi.getReport(today, today),
       reportsApi.inventory(),
+      salesApi.list({ pageSize: 5 }),
     ])
-      .then(([saleRes, invRes]: any[]) => {
+      .then(([saleRes, invRes, recentRes]: any[]) => {
         setSalesReport(saleRes.data ?? null);
         setInventoryReport(invRes.data ?? null);
+        const raw = recentRes.data?.items ?? recentRes.data ?? [];
+        const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+        const normalize = (s: any) => ({
+          ...s,
+          isLocationAssigned: s.isLocationAssigned ?? (!!s.locationId && s.locationId !== EMPTY_GUID),
+          createdOnUtc: s.createdOnUtc ?? s.occurredOnUtc ?? '',
+        });
+        setRecentSales((Array.isArray(raw) ? raw : []).map(normalize));
       })
       .catch((err: unknown) => {
         if (!(err instanceof ApiError && err.status === 403)) {
@@ -171,12 +184,6 @@ function SalesTabContent({
         }
       })
       .finally(() => setLoading(false));
-
-    // Fetch recent sales separately
-    import('@/src/lib/api/commerce').then(({ salesApi: sApi }) => {
-      // Use activity log as fallback since there's no direct recent-sales endpoint on salesApi
-      // We piggyback on the report endpoint
-    }).catch(() => {});
   }, [selectedStore, today]);
 
   const selectedStoreName =

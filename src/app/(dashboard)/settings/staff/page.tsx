@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
+import { CustomSelect } from '@/src/components/ui/CustomSelect';
 import {
   Users,
   Plus,
@@ -17,6 +18,7 @@ import {
   DollarSign,
   Clock,
   ArrowLeft,
+  ArrowRight,
   X,
   ChevronRight,
   Phone,
@@ -24,15 +26,26 @@ import {
   CreditCard,
   Building2,
   Check,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+  Calendar,
+  MapPin,
+  Mail,
+  User,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 import Link from 'next/link';
 
-const TABS = ['Overview', 'Payroll', 'Shifts & Attendance'] as const;
-type MainTab = (typeof TABS)[number];
+// ─── Constants & Styling Helpers matching Mobile App ─────────────────────────
 
+const BLUE = '#0055FF';
+
+type MainTab = 'Overview' | 'Payroll' | 'Shifts';
 type ProfileSubTab = 'Overview' | 'Payroll' | 'Activity' | 'Settings';
 
-function fmt(n: number = 0) {
+function fmt(n?: number | null) {
   return `₦${(n ?? 0).toLocaleString('en-NG')}`;
 }
 
@@ -40,20 +53,53 @@ function initials(firstName: string = '', lastName: string = '') {
   return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase() || 'ST';
 }
 
-const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }> = {
-  Active: { label: 'Active', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', color: '#16A34A' },
-  OnLeave: { label: 'On Leave', bg: 'bg-amber-50 text-amber-700 border-amber-200', color: '#D97706' },
-  Suspended: { label: 'Suspended', bg: 'bg-rose-50 text-rose-700 border-rose-200', color: '#EF4444' },
+const STATUS_STYLE: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  Active: { label: 'Active', bg: 'bg-[#DCFCE7]', color: 'text-[#16A34A]', border: 'border-[#BBF7D0]' },
+  OnLeave: { label: 'On Leave', bg: 'bg-[#FEF3C7]', color: 'text-[#D97706]', border: 'border-[#FDE68A]' },
+  Suspended: { label: 'Suspended', bg: 'bg-[#FEE2E2]', color: 'text-[#EF4444]', border: 'border-[#FECACA]' },
 };
 
 const PAYROLL_STATUS_STYLE: Record<string, { label: string; bg: string; text: string }> = {
-  Draft: { label: 'Draft', bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700' },
-  Scheduled: { label: 'Scheduled', bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
-  Paid: { label: 'Disbursed', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
+  Draft: { label: 'Draft', bg: 'bg-[#FEF3C7]', text: 'text-[#D97706]' },
+  Scheduled: { label: 'Scheduled', bg: 'bg-[#DBEAFE]', text: 'text-[#0055FF]' },
+  Paid: { label: 'Disbursed', bg: 'bg-[#DCFCE7]', text: 'text-[#16A34A]' },
 };
 
+const GOVT_ID_OPTIONS = [
+  { value: 'NIN', label: 'NIN - National Identification Number' },
+  { value: 'Passport', label: 'International Passport' },
+  { value: 'VoterID', label: "Voter's Card" },
+  { value: 'DriverLicense', label: "Driver's License" },
+];
+
+const BANK_OPTIONS = [
+  { value: 'Access Bank', label: 'Access Bank' },
+  { value: 'GTBank', label: 'Guaranty Trust Bank (GTB)' },
+  { value: 'First Bank', label: 'First Bank of Nigeria' },
+  { value: 'Kuda Bank', label: 'Kuda Bank' },
+  { value: 'OPay', label: 'OPay' },
+  { value: 'Zenith Bank', label: 'Zenith Bank' },
+  { value: 'UBA', label: 'United Bank for Africa (UBA)' },
+];
+
+const EMPLOYMENT_TYPE_OPTIONS = [
+  { value: 'Full-Time', label: 'Full-Time' },
+  { value: 'Part-Time', label: 'Part-Time' },
+  { value: 'Contract', label: 'Contract' },
+];
+
+const PAY_PERIOD_OPTIONS = [
+  { value: 'Monthly', label: 'Monthly' },
+  { value: 'Bi-Weekly', label: 'Bi-Weekly' },
+  { value: 'Weekly', label: 'Weekly' },
+];
+
+// ───────────────────────────────────────────────────────────────────────────────
+// ─── Main Staff Screen Component ───────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────────────
+
 export default function StaffManagementPage() {
-  const [activeTab, setActiveTab] = useState<MainTab>('Overview');
+  const [mainTab, setMainTab] = useState<MainTab>('Overview');
 
   // Staff Data State
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -61,26 +107,34 @@ export default function StaffManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // Main navigation / screen stack
+  // Stats
+  const [staffStats, setStaffStats] = useState<any>(null);
+  const [attendanceStats, setAttendanceStats] = useState<any>(null);
+
+  // Sub-screen Stack (Matches Mobile Navigation)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
-  const [showAddWizard, setShowAddWizard] = useState(false);
+  const [addStaffStep, setAddStaffStep] = useState<number | null>(null); // 1..4
   const [runPayrollOpen, setRunPayrollOpen] = useState(false);
   const [selectedPayslipRef, setSelectedPayslipRef] = useState<{ runId: string; staffId: string } | null>(null);
 
   const fetchStaffData = async () => {
     setLoading(true);
     try {
-      const [usersRes, rolesRes]: any[] = await Promise.all([
+      const [usersRes, rolesRes, statsRes, attStatsRes]: any[] = await Promise.all([
         usersApi.list().catch(() => staffApi.list()),
         staffApi.listRoles().catch(() => ({ data: [] })),
+        staffApi.getStats().catch(() => ({ data: null })),
+        staffApi.getAttendanceStats().catch(() => ({ data: null })),
       ]);
 
       const rawStaffList = usersRes?.data ?? usersRes?.items ?? usersRes;
-      const listArray = Array.isArray(rawStaffList) ? rawStaffList : [];
-      setStaffList(listArray);
+      setStaffList(Array.isArray(rawStaffList) ? rawStaffList : []);
 
       const rawRoles = rolesRes?.data ?? rolesRes?.items ?? rolesRes;
       setRoles(Array.isArray(rawRoles) ? rawRoles : []);
+
+      setStaffStats(statsRes?.data ?? statsRes);
+      setAttendanceStats(attStatsRes?.data ?? attStatsRes);
     } catch (err) {
       toast.error('Failed to load staff data');
       setStaffList([]);
@@ -93,44 +147,24 @@ export default function StaffManagementPage() {
     fetchStaffData();
   }, []);
 
-  const safeStaffList = useMemo(() => {
-    return Array.isArray(staffList) ? staffList : [];
-  }, [staffList]);
+  const safeStaffList = useMemo(() => (Array.isArray(staffList) ? staffList : []), [staffList]);
 
   const filteredStaff = useMemo(() => {
     if (!search.trim()) return safeStaffList;
     const q = search.toLowerCase();
     return safeStaffList.filter(
-      (s) =>
-        s.firstName?.toLowerCase().includes(q) ||
-        s.lastName?.toLowerCase().includes(q) ||
-        s.email?.toLowerCase().includes(q) ||
-        s.jobTitle?.toLowerCase().includes(q) ||
-        s.roleName?.toLowerCase().includes(q)
+      (m) =>
+        `${m.firstName || ''} ${m.lastName || ''} ${m.jobTitle || ''} ${m.email || ''}`
+          .toLowerCase()
+          .includes(q)
     );
   }, [safeStaffList, search]);
 
-  const activeStaffCount = useMemo(
-    () => safeStaffList.filter((s) => s.isActive !== false && s.status !== 'Suspended').length,
-    [safeStaffList]
-  );
+  const totalStaffCount = staffStats?.totalStaff ?? safeStaffList.length;
+  const activeTodayCount = attendanceStats?.activeTodayCount ?? safeStaffList.filter((s) => s.isActive !== false).length;
+  const unavailableCount = staffStats?.unavailable ?? safeStaffList.filter((s) => s.status === 'OnLeave' || s.status === 'Suspended').length;
 
-  const handleToggleStatus = async (staff: any) => {
-    try {
-      if (staff.isActive !== false) {
-        await usersApi.disable(staff.id).catch(() => staffApi.deactivate(staff.id));
-        toast.success(`${staff.firstName} has been deactivated`);
-      } else {
-        await usersApi.enable(staff.id);
-        toast.success(`${staff.firstName} has been activated`);
-      }
-      fetchStaffData();
-    } catch (err) {
-      toast.error('Failed to update staff status');
-    }
-  };
-
-  // Sub-screen rendering: Payslip Receipt
+  // Sub-screen 1: Payslip Receipt View
   if (selectedPayslipRef) {
     return (
       <PayslipReceiptScreen
@@ -141,7 +175,7 @@ export default function StaffManagementPage() {
     );
   }
 
-  // Sub-screen rendering: Run Payroll
+  // Sub-screen 2: Run Payroll Screen
   if (runPayrollOpen) {
     return (
       <RunPayrollScreen
@@ -153,21 +187,22 @@ export default function StaffManagementPage() {
     );
   }
 
-  // Sub-screen rendering: Add Staff Wizard
-  if (showAddWizard) {
+  // Sub-screen 3: Add Staff 4-Step Wizard Flow
+  if (addStaffStep !== null) {
     return (
-      <AddStaffWizardScreen
+      <AddStaffFlowScreen
+        initialStep={addStaffStep}
         roles={roles}
         onDone={() => {
-          setShowAddWizard(false);
+          setAddStaffStep(null);
           fetchStaffData();
         }}
-        onCancel={() => setShowAddWizard(false)}
+        onCancel={() => setAddStaffStep(null)}
       />
     );
   }
 
-  // Sub-screen rendering: Staff Profile
+  // Sub-screen 4: Staff Profile Screen
   if (selectedStaffId) {
     return (
       <StaffProfileScreen
@@ -182,7 +217,7 @@ export default function StaffManagementPage() {
 
   return (
     <div className="space-y-6 pb-12 max-w-7xl mx-auto">
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
@@ -192,7 +227,7 @@ export default function StaffManagementPage() {
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-[#0A0D14]">Staff Management</h1>
+            <h1 className="text-2xl font-bold text-[#0A0D14]">Staff & Payroll</h1>
             <p className="text-sm text-[#64748B] mt-0.5">
               Manage your team members, permissions, shifts, and payroll disbursal.
             </p>
@@ -201,29 +236,29 @@ export default function StaffManagementPage() {
 
         <button
           type="button"
-          onClick={() => setShowAddWizard(true)}
-          className="h-10 px-4 rounded-xl bg-[#0055FF] text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto shadow-sm"
+          onClick={() => setAddStaffStep(1)}
+          className="h-10 px-4 rounded-xl bg-[#0055FF] text-white text-sm font-semibold hover:bg-blue-700 flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto shadow-sm"
         >
           <Plus size={16} />
-          <span>Add Staff Member</span>
+          <span> Add Staff</span>
         </button>
       </div>
 
-      {/* Main Tabs */}
-      <div className="border-b border-[#F1F5F9]">
+      {/* Main Tabs (Overview | Payroll | Shifts) */}
+      <div className="border-b border-[#E2E8F0]">
         <div className="flex gap-8">
-          {TABS.map((t) => (
+          {(['Overview', 'Payroll', 'Shifts'] as const).map((t) => (
             <button
               key={t}
               type="button"
-              onClick={() => setActiveTab(t)}
+              onClick={() => setMainTab(t)}
               className={cn(
                 'py-3 text-sm font-semibold transition-colors cursor-pointer relative',
-                activeTab === t ? 'text-[#0055FF]' : 'text-[#64748B] hover:text-[#0A0D14]'
+                mainTab === t ? 'text-[#0A0D14]' : 'text-[#64748B] hover:text-[#0A0D14]'
               )}
             >
               {t}
-              {activeTab === t && (
+              {mainTab === t && (
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0055FF] rounded-full" />
               )}
             </button>
@@ -231,150 +266,133 @@ export default function StaffManagementPage() {
         </div>
       </div>
 
-      {/* ── 1. Overview Tab ── */}
-      {activeTab === 'Overview' && (
+      {/* ── OVERVIEW TAB ── */}
+      {mainTab === 'Overview' && (
         <div className="space-y-6">
-          {/* Summary Stat Cards */}
+          {/* Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm">
-              <div className="w-9 h-9 rounded-xl bg-[#EFF5FF] text-[#0055FF] flex items-center justify-center mb-3">
-                <Users size={18} />
+            <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4">
+              <div className="w-8 h-8 rounded-lg bg-[#EFF5FF] text-[#0055FF] flex items-center justify-center mb-2">
+                <Users size={16} />
               </div>
-              <p className="text-xs text-[#64748B]">Total Staff Members</p>
-              <p className="text-2xl font-bold text-[#0A0D14] mt-1">{safeStaffList.length}</p>
+              <p className="text-xl font-bold text-[#0A0D14]">{totalStaffCount}</p>
+              <p className="text-xs text-[#64748B] mt-0.5">Total Staff</p>
             </div>
 
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm">
-              <div className="w-9 h-9 rounded-xl bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center mb-3">
-                <UserCheck size={18} />
+            <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4">
+              <div className="w-8 h-8 rounded-lg bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center mb-2">
+                <UserCheck size={16} />
               </div>
-              <p className="text-xs text-[#64748B]">Active Members</p>
-              <p className="text-2xl font-bold text-[#0A0D14] mt-1">{activeStaffCount}</p>
+              <p className="text-xl font-bold text-[#0A0D14]">{activeTodayCount}</p>
+              <p className="text-xs text-[#64748B] mt-0.5">Active Today</p>
             </div>
 
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm">
-              <div className="w-9 h-9 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mb-3">
-                <Shield size={18} />
+            <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4">
+              <div className="w-8 h-8 rounded-lg bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center mb-2">
+                <Shield size={16} />
               </div>
-              <p className="text-xs text-[#64748B]">Configured Roles</p>
-              <p className="text-2xl font-bold text-[#0A0D14] mt-1">{roles.length || 3}</p>
+              <p className="text-xl font-bold text-[#0A0D14]">{unavailableCount}</p>
+              <p className="text-xs text-[#64748B] mt-0.5">Unavailable</p>
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="relative max-w-md">
-            <Search size={16} className="absolute left-3.5 top-3 text-[#94A3B8]" />
-            <input
-              type="text"
-              placeholder="Search by name, email, title or role..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-[#0A0D14] placeholder-[#94A3B8] focus:outline-none focus:border-[#0055FF]"
-            />
-          </div>
+          {/* Add Staff Button Banner */}
+          <button
+            type="button"
+            onClick={() => setAddStaffStep(1)}
+            className="w-full h-12 rounded-xl bg-[#0055FF] text-white text-sm font-semibold hover:bg-blue-700 flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            <span> Add Staff</span>
+          </button>
 
-          {/* Staff Table */}
-          {loading ? (
-            <div className="py-12 text-center text-sm text-[#64748B]">Loading staff members...</div>
-          ) : filteredStaff.length === 0 ? (
-            <div className="py-12 text-center text-sm text-[#94A3B8]">No staff members found</div>
-          ) : (
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[#64748B] font-semibold">
-                  <tr>
-                    <th className="py-3.5 px-4">Name & Title</th>
-                    <th className="py-3.5 px-4">Contact</th>
-                    <th className="py-3.5 px-4">Role</th>
-                    <th className="py-3.5 px-4">Employment</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F1F5F9]">
-                  {filteredStaff.map((staff) => {
-                    const statusKey = staff.status || (staff.isActive !== false ? 'Active' : 'Suspended');
-                    const statusBadge = STATUS_STYLE[statusKey] || STATUS_STYLE.Active;
+          {/* Staff Directory Section */}
+          <div className="space-y-3">
+            <h2 className="text-base font-semibold text-[#0A0D14]">Staff Directory</h2>
+
+            {/* Search input */}
+            <div className="relative max-w-md">
+              <Search size={16} className="absolute left-3.5 top-3 text-[#94A3B8]" />
+              <input
+                type="text"
+                placeholder="Search staff"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-sm text-[#0A0D14] placeholder-[#94A3B8] focus:outline-none focus:border-[#0055FF]"
+              />
+            </div>
+
+            {/* Directory Table / Cards */}
+            {loading ? (
+              <div className="py-12 text-center text-sm text-[#64748B]">Loading staff...</div>
+            ) : filteredStaff.length === 0 ? (
+              <div className="py-12 text-center text-sm text-[#94A3B8]">No staff found</div>
+            ) : (
+              <div className="bg-white border border-[#F1F5F9] rounded-2xl overflow-hidden shadow-sm">
+                <div className="divide-y divide-[#F1F5F9]">
+                  {filteredStaff.map((member) => {
+                    const statusKey = member.status || (member.isActive !== false ? 'Active' : 'Suspended');
+                    const statusStyle = STATUS_STYLE[statusKey] || STATUS_STYLE.Active;
 
                     return (
-                      <tr key={staff.id} className="hover:bg-[#F8FAFC] transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-[#0A0D14]">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[#EFF5FF] text-[#0055FF] font-bold flex items-center justify-center text-xs border border-[#BFDBFE]">
-                              {initials(staff.firstName, staff.lastName)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-[#0A0D14]">
-                                {staff.firstName} {staff.lastName}
-                              </p>
-                              <p className="text-[11px] text-[#64748B] font-normal">{staff.jobTitle || 'Staff Member'}</p>
-                            </div>
+                      <div
+                        key={member.id}
+                        onClick={() => setSelectedStaffId(member.id)}
+                        className="p-4 flex items-center justify-between hover:bg-[#F8FAFC] cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#EFF5FF] text-[#0055FF] font-bold text-sm flex items-center justify-center border border-[#BFDBFE]">
+                            {initials(member.firstName, member.lastName)}
                           </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-[#64748B]">
-                          <p>{staff.email || '—'}</p>
-                          <p className="text-[11px] text-[#94A3B8]">{staff.phoneNumber || '—'}</p>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="text-[11px] font-semibold text-[#0055FF] bg-[#EFF5FF] px-2.5 py-0.5 rounded-full border border-[#BFDBFE]">
-                            {staff.roleName || staff.role || (staff.isOwner ? 'Owner' : 'Staff')}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-[#64748B]">
-                          {staff.employmentType || 'Full-Time'}
-                        </td>
-                        <td className="py-3.5 px-4">
+                          <div>
+                            <p className="text-sm font-semibold text-[#0A0D14]">
+                              {member.firstName} {member.lastName}
+                            </p>
+                            <p className="text-xs text-[#64748B] mt-0.5">
+                              {member.jobTitle || 'Staff Member'} • {member.employmentType || 'Full-Time'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
                           <span
                             className={cn(
-                              'text-[11px] font-semibold px-2.5 py-0.5 rounded-full border',
-                              statusBadge.bg
+                              'text-xs font-semibold px-2.5 py-0.5 rounded-full border',
+                              statusStyle.bg,
+                              statusStyle.color,
+                              statusStyle.border
                             )}
                           >
-                            {statusBadge.label}
+                            {statusStyle.label}
                           </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right space-x-3">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedStaffId(staff.id)}
-                            className="text-[#0055FF] font-semibold hover:underline cursor-pointer"
-                          >
-                            Profile & Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(staff)}
-                            className="text-[#64748B] font-semibold hover:text-[#0A0D14] cursor-pointer"
-                          >
-                            {staff.isActive !== false ? 'Deactivate' : 'Activate'}
-                          </button>
-                        </td>
-                      </tr>
+                          <ChevronRight size={18} className="text-[#94A3B8]" />
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── 2. Payroll Tab ── */}
-      {activeTab === 'Payroll' && (
+      {/* ── PAYROLL TAB ── */}
+      {mainTab === 'Payroll' && (
         <PayrollTabContent
           onOpenRunPayroll={() => setRunPayrollOpen(true)}
           onViewPayslip={(runId, staffId) => setSelectedPayslipRef({ runId, staffId })}
         />
       )}
 
-      {/* ── 3. Shifts & Attendance Tab ── */}
-      {activeTab === 'Shifts & Attendance' && <ShiftsTabContent staffList={safeStaffList} />}
+      {/* ── SHIFTS TAB ── */}
+      {mainTab === 'Shifts' && <ShiftsTabContent safeStaffList={safeStaffList} />}
     </div>
   );
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// ─── Sub-Tab / Screen 1: Staff Profile Screen (Replicates Mobile StaffProfile) ──
+// ─── Sub-Tab / Screen 1: Staff Profile Screen (Overview/Payroll/Activity/Settings)
 // ───────────────────────────────────────────────────────────────────────────────
 
 function StaffProfileScreen({
@@ -392,7 +410,6 @@ function StaffProfileScreen({
 }) {
   const [subTab, setSubTab] = useState<ProfileSubTab>('Overview');
 
-  // Staff profile state
   const [profile, setProfile] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
   const [payHistory, setPayHistory] = useState<any[]>([]);
@@ -400,14 +417,14 @@ function StaffProfileScreen({
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modals inside profile
-  const [payStaffModalOpen, setPayStaffModalOpen] = useState(false);
+  // Modal states
+  const [payStaffSheetOpen, setPayStaffSheetOpen] = useState(false);
   const [payPartialMode, setPayPartialMode] = useState(false);
   const [partialAmount, setPartialAmount] = useState('');
   const [payNotes, setPayNotes] = useState('');
   const [paying, setPaying] = useState(false);
 
-  const [payrollConfigModalOpen, setPayrollConfigModalOpen] = useState(false);
+  const [payrollConfigSheetOpen, setPayrollConfigSheetOpen] = useState(false);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
 
   const loadProfileData = async () => {
@@ -421,11 +438,8 @@ function StaffProfileScreen({
         activityApi.list({ staffUserId: staffId, limit: 15 }).catch(() => ({ data: [] })),
       ]);
 
-      const profData = profRes?.data ?? profRes;
-      setProfile(profData || null);
-
-      const cfgData = configRes?.data ?? configRes;
-      setConfig(cfgData || null);
+      setProfile(profRes?.data ?? profRes ?? null);
+      setConfig(configRes?.data ?? configRes ?? null);
 
       const histItems = historyRes?.data?.items ?? historyRes?.items ?? historyRes?.data ?? [];
       setPayHistory(Array.isArray(histItems) ? histItems : []);
@@ -436,7 +450,7 @@ function StaffProfileScreen({
       const actItems = actRes?.data?.items ?? actRes?.items ?? actRes?.data ?? [];
       setActivities(Array.isArray(actItems) ? actItems : []);
     } catch (err) {
-      toast.error('Failed to load staff details');
+      toast.error('Failed to load profile details');
     } finally {
       setLoading(false);
     }
@@ -451,16 +465,17 @@ function StaffProfileScreen({
     return Math.max(0, (config.baseAmount || 0) + (config.totalAllowances || 0) - (config.totalDeductions || 0));
   }, [config]);
 
-  const handlePayStaff = async () => {
+  const handlePay = async () => {
     if (!payNotes.trim()) {
-      toast.error('Please add payment notes');
+      toast.error('Payment notes are required');
       return;
     }
     const amt = payPartialMode ? Number(partialAmount) : undefined;
     if (payPartialMode && (!amt || Number.isNaN(amt))) {
-      toast.error('Please enter a valid partial amount');
+      toast.error('Enter a valid partial amount');
       return;
     }
+
     setPaying(true);
     try {
       await staffApi.adHocPay({
@@ -468,13 +483,13 @@ function StaffProfileScreen({
         notes: payNotes.trim(),
         amount: amt,
       });
-      toast.success('Payment disbursed successfully to staff Vintran wallet!');
-      setPayStaffModalOpen(false);
+      toast.success('Payment disbursed to staff Vintran wallet!');
+      setPayStaffSheetOpen(false);
       setPayNotes('');
       setPartialAmount('');
       loadProfileData();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.description : 'Failed to disburse payment');
+      toast.error('Payment failed');
     } finally {
       setPaying(false);
     }
@@ -483,7 +498,7 @@ function StaffProfileScreen({
   const handleSetStatus = async (status: string) => {
     try {
       await staffApi.setStatus(staffId, status);
-      toast.success(`Status updated to ${status}`);
+      toast.success(`Status set to ${status}`);
       setStatusPickerOpen(false);
       loadProfileData();
       onStaffUpdated();
@@ -493,87 +508,69 @@ function StaffProfileScreen({
   };
 
   const handleDeactivate = async () => {
-    if (!confirm('Are you sure you want to deactivate this staff member? This will revoke app access.')) return;
+    if (!confirm('Deactivate staff member? This will revoke app access immediately.')) return;
     try {
       await staffApi.deactivate(staffId);
       toast.success('Staff member deactivated');
       onBack();
       onStaffUpdated();
     } catch (err) {
-      toast.error('Failed to deactivate staff member');
+      toast.error('Failed to deactivate staff');
     }
   };
 
   if (loading) {
-    return (
-      <div className="py-20 text-center text-sm text-[#64748B]">
-        Loading staff profile...
-      </div>
-    );
+    return <div className="py-20 text-center text-sm text-[#64748B]">Loading staff profile...</div>;
   }
 
   const staffName = profile ? `${profile.firstName} ${profile.lastName}` : 'Staff Member';
   const statusKey = profile?.status || (profile?.isActive !== false ? 'Active' : 'Suspended');
-  const statusBadge = STATUS_STYLE[statusKey] || STATUS_STYLE.Active;
+  const statusStyle = STATUS_STYLE[statusKey] || STATUS_STYLE.Active;
 
   return (
-    <div className="space-y-6 pb-12 max-w-5xl mx-auto">
-      {/* Header */}
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+      {/* Top Header */}
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-[#0A0D14] transition-colors cursor-pointer"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-[#0A0D14] cursor-pointer"
         >
           <ArrowLeft size={18} />
         </button>
-        <div>
-          <h1 className="text-xl font-bold text-[#0A0D14]">Staff Profile</h1>
-          <p className="text-xs text-[#64748B]">View personal details, payroll history, and account settings.</p>
-        </div>
+        <h1 className="text-xl font-bold text-[#0A0D14]">Staff Profile</h1>
       </div>
 
-      {/* Staff Profile Header Card */}
-      <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-[#EFF5FF] text-[#0055FF] font-bold text-xl flex items-center justify-center border-2 border-[#BFDBFE]">
-            {initials(profile?.firstName, profile?.lastName)}
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-[#0A0D14]">{staffName}</h2>
-            <p className="text-sm text-[#64748B] mt-0.5">{profile?.jobTitle || 'Staff Member'}</p>
-            <div className="flex items-center gap-2 mt-2">
-              <button
-                type="button"
-                onClick={() => setStatusPickerOpen(true)}
-                className={cn(
-                  'text-xs font-semibold px-2.5 py-0.5 rounded-full border cursor-pointer hover:opacity-80 transition-opacity',
-                  statusBadge.bg
-                )}
-              >
-                {statusBadge.label} (Change)
-              </button>
-              <span className="text-xs font-semibold text-[#0055FF] bg-[#EFF5FF] px-2.5 py-0.5 rounded-full border border-[#BFDBFE]">
-                {profile?.employmentType || 'Full-Time'}
-              </span>
-            </div>
-          </div>
+      {/* Profile Card Header */}
+      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 text-center flex flex-col items-center justify-center space-y-3">
+        <div className="w-16 h-16 rounded-full bg-[#EFF5FF] text-[#0055FF] font-bold text-2xl flex items-center justify-center border-2 border-[#BFDBFE]">
+          {initials(profile?.firstName, profile?.lastName)}
         </div>
-
-        <div className="flex items-center gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-[#0A0D14]">{staffName}</h2>
+          <p className="text-xs text-[#64748B] mt-0.5">{profile?.jobTitle || 'Staff Member'}</p>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setPayStaffModalOpen(true)}
-            className="h-10 px-4 rounded-xl bg-[#0055FF] text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
+            onClick={() => setStatusPickerOpen(true)}
+            className={cn(
+              'text-xs font-semibold px-2.5 py-0.5 rounded-full border cursor-pointer hover:opacity-80 transition-opacity',
+              statusStyle.bg,
+              statusStyle.color,
+              statusStyle.border
+            )}
           >
-            <DollarSign size={16} />
-            <span>Pay Staff</span>
+            {statusStyle.label}
           </button>
+          <span className="text-xs font-semibold text-[#0055FF] bg-[#EFF5FF] px-2.5 py-0.5 rounded-full border border-[#BFDBFE]">
+            {profile?.employmentType || 'Full-Time'}
+          </span>
         </div>
       </div>
 
-      {/* Profile Sub-tabs */}
-      <div className="border-b border-[#F1F5F9]">
+      {/* Sub-tabs Navigation */}
+      <div className="border-b border-[#E2E8F0]">
         <div className="flex gap-6">
           {(['Overview', 'Payroll', 'Activity', 'Settings'] as const).map((t) => (
             <button
@@ -581,326 +578,326 @@ function StaffProfileScreen({
               type="button"
               onClick={() => setSubTab(t)}
               className={cn(
-                'py-2.5 text-sm font-semibold transition-colors cursor-pointer relative',
-                subTab === t ? 'text-[#0055FF]' : 'text-[#64748B] hover:text-[#0A0D14]'
+                'py-2.5 text-xs font-semibold transition-colors cursor-pointer relative',
+                subTab === t ? 'text-[#0A0D14]' : 'text-[#64748B] hover:text-[#0A0D14]'
               )}
             >
               {t}
-              {subTab === t && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0055FF] rounded-full" />
-              )}
+              {subTab === t && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0055FF] rounded-full" />}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Sub-tab 1: OVERVIEW */}
+      {/* ── Sub-tab 1: OVERVIEW ── */}
       {subTab === 'Overview' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Contact Info */}
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-              <h3 className="text-sm font-bold text-[#0A0D14] flex items-center gap-2">
-                <Phone size={16} className="text-[#0055FF]" /> Contact Information
-              </h3>
-              <div className="divide-y divide-[#F1F5F9] text-xs">
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Phone Number</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.phoneNumber || '—'}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Email Address</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.email || '—'}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Home Address</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.homeAddress || '—'}</span>
-                </div>
+        <div className="space-y-4 text-xs">
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+            <h3 className="font-semibold text-[#0A0D14] mb-3">Contact Information</h3>
+            {[
+              { label: 'Phone Number', value: profile?.phoneNumber || '—' },
+              { label: 'Email', value: profile?.email || '—' },
+              { label: 'Address', value: profile?.homeAddress || '—' },
+            ].map((r) => (
+              <div key={r.label} className="flex justify-between py-2 border-b border-[#EAECF0] last:border-0">
+                <span className="text-[#64748B]">{r.label}</span>
+                <span className="font-medium text-[#0A0D14]">{r.value}</span>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Employment Details */}
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-              <h3 className="text-sm font-bold text-[#0A0D14] flex items-center gap-2">
-                <Briefcase size={16} className="text-[#0055FF]" /> Employment Details
-              </h3>
-              <div className="divide-y divide-[#F1F5F9] text-xs">
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Start Date</span>
-                  <span className="font-semibold text-[#0A0D14]">
-                    {profile?.startDate ? new Date(profile.startDate).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
-                  </span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">{profile?.governmentIdType || 'Government ID'}</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.governmentIdNumber || '—'}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Next of Kin</span>
-                  <span className="font-semibold text-[#0A0D14]">
-                    {profile?.nextOfKinFirstName
-                      ? `${profile.nextOfKinFirstName} ${profile.nextOfKinLastName || ''} (${profile.nextOfKinContact || '—'})`
-                      : '—'}
-                  </span>
-                </div>
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+            <h3 className="font-semibold text-[#0A0D14] mb-3">Employment Details</h3>
+            {[
+              { label: 'Start Date', value: profile?.startDate ? new Date(profile.startDate).toLocaleDateString() : '—' },
+              { label: profile?.governmentIdType || 'Government ID', value: profile?.governmentIdNumber || '—' },
+              {
+                label: 'Next of Kin',
+                value: profile?.nextOfKinFirstName
+                  ? `${profile.nextOfKinFirstName} ${profile.nextOfKinLastName || ''} (${profile.nextOfKinContact || '—'})`
+                  : '—',
+              },
+            ].map((r) => (
+              <div key={r.label} className="flex justify-between py-2 border-b border-[#EAECF0] last:border-0">
+                <span className="text-[#64748B]">{r.label}</span>
+                <span className="font-medium text-[#0A0D14]">{r.value}</span>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Vintran Wallet */}
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-              <h3 className="text-sm font-bold text-[#0A0D14] flex items-center gap-2">
-                <CreditCard size={16} className="text-[#0055FF]" /> Vintran Wallet
-              </h3>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[#64748B]">Linked Wallet Account</span>
-                <span className="font-semibold text-[#0055FF]">
-                  {profile?.vintranAccountId ? `Linked (${profile.vintranAccountId.slice(0, 8)}…)` : 'Not linked yet'}
-                </span>
-              </div>
-            </div>
-
-            {/* Bank Details */}
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-              <h3 className="text-sm font-bold text-[#0A0D14] flex items-center gap-2">
-                <Building2 size={16} className="text-[#0055FF]" /> Bank Details
-              </h3>
-              <div className="divide-y divide-[#F1F5F9] text-xs">
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Bank Name</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.bankName || '—'}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Account Number</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.bankAccountNumber || '—'}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#64748B]">Account Name</span>
-                  <span className="font-semibold text-[#0A0D14]">{profile?.bankAccountName || '—'}</span>
-                </div>
-              </div>
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+            <h3 className="font-semibold text-[#0A0D14] mb-2">Vintran Wallet</h3>
+            <div className="flex justify-between py-1">
+              <span className="text-[#64748B]">Wallet Account</span>
+              <span className="font-semibold text-[#0A0D14]">
+                {profile?.vintranAccountId ? `Linked (${profile.vintranAccountId.slice(0, 8)}…)` : 'Not linked yet'}
+              </span>
             </div>
           </div>
 
-          {/* Recent Sales */}
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-[#0A0D14]">Recent Sales</h3>
-            {recentSales.length === 0 ? (
-              <p className="text-xs text-[#94A3B8]">No sales recorded yet by this staff member</p>
-            ) : (
-              <div className="divide-y divide-[#F1F5F9]">
-                {recentSales.map((sale) => (
-                  <div key={sale.id} className="py-3 flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-semibold text-[#0A0D14]">{sale.number || sale.id}</p>
-                      <p className="text-[#64748B] text-[11px] mt-0.5">{sale.channel || 'InStore'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-[#0A0D14]">{fmt(sale.grandTotal)}</p>
-                      <p className="text-[11px] text-[#94A3B8]">
-                        {sale.createdOnUtc ? new Date(sale.createdOnUtc).toLocaleDateString() : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+            <h3 className="font-semibold text-[#0A0D14] mb-3">Bank Details</h3>
+            {[
+              { label: 'Bank Name', value: profile?.bankName || '—' },
+              { label: 'Account Number', value: profile?.bankAccountNumber || '—' },
+              { label: 'Account Name', value: profile?.bankAccountName || '—' },
+            ].map((r) => (
+              <div key={r.label} className="flex justify-between py-2 border-b border-[#EAECF0] last:border-0">
+                <span className="text-[#64748B]">{r.label}</span>
+                <span className="font-medium text-[#0A0D14]">{r.value}</span>
               </div>
+            ))}
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <h3 className="font-semibold text-[#0A0D14]">Recent Sales</h3>
+            {recentSales.length === 0 ? (
+              <p className="text-[#94A3B8] text-center py-4">No sales recorded yet</p>
+            ) : (
+              recentSales.map((sale) => (
+                <div key={sale.id} className="flex justify-between py-2 border-b border-[#F1F5F9]">
+                  <div>
+                    <p className="font-semibold text-[#0A0D14]">{sale.number || sale.id}</p>
+                    <p className="text-[11px] text-[#16A34A]">{sale.channel || 'InStore'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-[#0A0D14]">{fmt(sale.grandTotal)}</p>
+                    <p className="text-[11px] text-[#64748B]">{new Date(sale.createdOnUtc).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setSubTab('Activity')}
+            className="w-full h-11 rounded-xl bg-[#EFF5FF] text-[#0055FF] font-semibold text-xs hover:bg-blue-100 transition-colors"
+          >
+            View Activities
+          </button>
         </div>
       )}
 
-      {/* Sub-tab 2: PAYROLL */}
+      {/* ── Sub-tab 2: PAYROLL ── */}
       {subTab === 'Payroll' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-base font-bold text-[#0A0D14]">Payroll Configuration</h3>
-            <button
-              type="button"
-              onClick={() => setPayrollConfigModalOpen(true)}
-              className="text-xs font-semibold text-[#0055FF] bg-[#EFF5FF] hover:bg-blue-100 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
-            >
-              {config ? 'Edit Configuration' : 'Set Up Payroll'}
-            </button>
-          </div>
+        <div className="space-y-4 text-xs">
+          <button
+            type="button"
+            onClick={() => setPayStaffSheetOpen(true)}
+            disabled={!profile?.vintranAccountId}
+            className={cn(
+              'w-full h-12 rounded-xl bg-[#EFF5FF] text-[#0055FF] font-semibold text-xs hover:bg-blue-100 transition-colors',
+              !profile?.vintranAccountId && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            {profile?.vintranAccountId ? 'Pay Now' : 'Pay Now (No wallet linked)'}
+          </button>
 
-          {config ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Pay Config Card */}
-              <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-                <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Base Salary</h4>
-                <div className="divide-y divide-[#F1F5F9] text-xs">
-                  <div className="flex justify-between py-2">
-                    <span className="text-[#64748B]">Pay Type</span>
-                    <span className="font-semibold text-[#0A0D14]">
-                      {config.payType === 'Salary' ? 'Monthly Salary' : 'Hourly Rate'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2">
-                    <span className="text-[#64748B]">Base Amount</span>
-                    <span className="font-bold text-[#0A0D14]">{fmt(config.baseAmount)}</span>
-                  </div>
-                  <div className="flex justify-between py-2">
-                    <span className="text-[#64748B]">Pay Period</span>
-                    <span className="font-semibold text-[#0A0D14]">{config.period || 'Monthly'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Net Pay Summary Card */}
-              <div className="bg-[#EFF5FF] border border-[#BFDBFE] rounded-2xl p-5 shadow-sm space-y-3">
-                <h4 className="text-xs font-bold text-[#0055FF] uppercase tracking-wider">Net Take-Home Summary</h4>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-[#64748B]">Base + Allowances</span>
-                    <span className="font-semibold text-[#0A0D14]">
-                      {fmt((config.baseAmount || 0) + (config.totalAllowances || 0))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#64748B]">Total Deductions</span>
-                    <span className="font-semibold text-rose-600">-{fmt(config.totalDeductions)}</span>
-                  </div>
-                  <div className="pt-3 border-t border-[#BFDBFE] flex justify-between items-center">
-                    <span className="font-bold text-[#0A0D14]">Net Disbursal</span>
-                    <span className="text-xl font-bold text-[#0055FF]">{fmt(netPayNow)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 text-center shadow-sm">
-              <p className="text-sm text-[#64748B]">No payroll configuration set up for this staff member.</p>
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-[#0A0D14]">Pay Configuration</h3>
               <button
                 type="button"
-                onClick={() => setPayrollConfigModalOpen(true)}
-                className="mt-3 text-xs font-semibold text-[#0055FF] bg-[#EFF5FF] px-4 py-2 rounded-xl cursor-pointer hover:bg-blue-100"
+                onClick={() => setPayrollConfigSheetOpen(true)}
+                className="text-[#0055FF] font-semibold hover:underline"
               >
-                Set Up Payroll Now
+                {config ? 'Edit' : 'Set Up'}
               </button>
+            </div>
+            {config ? (
+              <div className="divide-y divide-[#EAECF0]">
+                <div className="flex justify-between py-2">
+                  <span className="text-[#64748B]">Pay Type</span>
+                  <span className="font-medium text-[#0A0D14]">
+                    {config.payType === 'Salary' ? 'Monthly Salary' : 'Hourly Rate'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-[#64748B]">Base Pay</span>
+                  <span className="font-bold text-[#0A0D14]">{fmt(config.baseAmount)}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-[#64748B]">Pay Period</span>
+                  <span className="font-medium text-[#0A0D14]">{config.period || 'Monthly'}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[#94A3B8]">No payroll configuration set up yet</p>
+            )}
+          </div>
+
+          {/* Allowances Box */}
+          {config && config.allowances?.length > 0 && (
+            <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+              <h3 className="font-bold text-[#0A0D14] mb-2">Allowances</h3>
+              {config.allowances.map((a: any, i: number) => (
+                <div key={i} className="flex justify-between py-1 border-b border-[#EAECF0] last:border-0">
+                  <span className="text-[#64748B]">{a.name}</span>
+                  <span className="font-semibold text-[#0A0D14]">{fmt(a.amount)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between py-2 font-bold border-t border-[#E2E8F0] pt-2">
+                <span>Total Allowances</span>
+                <span className="text-[#0055FF]">{fmt(config.totalAllowances)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Deductions Box */}
+          {config && config.deductions?.length > 0 && (
+            <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+              <h3 className="font-bold text-[#0A0D14] mb-2">Deductions</h3>
+              {config.deductions.map((d: any, i: number) => (
+                <div key={i} className="flex justify-between py-1 border-b border-[#EAECF0] last:border-0">
+                  <span className="text-[#64748B]">{d.name}</span>
+                  <span className="font-semibold text-rose-600">-{fmt(d.amount)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between py-2 font-bold border-t border-[#E2E8F0] pt-2">
+                <span>Total Deductions</span>
+                <span className="text-rose-600">-{fmt(config.totalDeductions)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Net Pay Summary Card */}
+          {config && (
+            <div className="bg-[#EFF5FF] border border-[#BFDBFE] rounded-2xl p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-[#0055FF]">Net Pay Summary</span>
+                <span className="text-[10px] font-semibold text-[#0055FF] bg-[#DBEAFE] px-2 py-0.5 rounded-full">
+                  {config.isActive !== false ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <div>
+                  <p className="text-[11px] text-[#64748B]">Base + Allowances</p>
+                  <p className="font-bold text-[#0A0D14]">
+                    {fmt((config.baseAmount || 0) + (config.totalAllowances || 0))}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-[#64748B]">Total Deductions</p>
+                  <p className="font-bold text-rose-600">-{fmt(config.totalDeductions)}</p>
+                </div>
+              </div>
+              <div className="border-t border-dashed border-[#BFDBFE] pt-3 flex justify-between items-center">
+                <span className="text-[#64748B]">Take Home (Net)</span>
+                <span className="text-xl font-bold text-[#0055FF]">{fmt(netPayNow)}</span>
+              </div>
             </div>
           )}
 
           {/* Payment History */}
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-[#0A0D14]">Payment History</h3>
+          <div className="space-y-3 pt-2">
+            <h3 className="font-semibold text-[#0A0D14]">Payment History</h3>
             {payHistory.length === 0 ? (
-              <p className="text-xs text-[#94A3B8]">No payment records found</p>
+              <p className="text-[#94A3B8] text-center py-4">No payments recorded yet</p>
             ) : (
-              <div className="divide-y divide-[#F1F5F9]">
-                {payHistory.map((p) => (
-                  <div
-                    key={p.payrollItemId || p.id}
-                    onClick={() => p.payrollRunId && onViewPayslip(p.payrollRunId, staffId)}
-                    className="py-3 flex items-center justify-between text-xs hover:bg-[#F8FAFC] px-2 rounded-xl cursor-pointer transition-colors"
-                  >
-                    <div>
-                      <p className="font-semibold text-[#0A0D14]">{p.payPeriodLabel || 'Disbursal'}</p>
-                      <p className="text-[11px] text-[#64748B]">
-                        {p.paidOnUtc ? new Date(p.paidOnUtc).toLocaleDateString() : p.runStatus}
-                      </p>
-                    </div>
-                    <div className="text-right flex items-center gap-3">
-                      <div>
-                        <p className="font-bold text-[#0A0D14]">{fmt(p.netPay)}</p>
-                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          {p.disbursementStatus || 'Completed'}
-                        </span>
-                      </div>
-                      <ChevronRight size={16} className="text-[#94A3B8]" />
-                    </div>
+              payHistory.map((p) => (
+                <div
+                  key={p.payrollItemId || p.id}
+                  onClick={() => p.payrollRunId && onViewPayslip(p.payrollRunId, staffId)}
+                  className="bg-[#F8FAFC] rounded-xl p-3.5 flex justify-between items-center cursor-pointer hover:bg-[#F1F5F9]"
+                >
+                  <div>
+                    <p className="font-semibold text-[#0A0D14]">{p.payPeriodLabel || 'Disbursal'}</p>
+                    <p className="text-[11px] text-[#64748B] mt-0.5">
+                      {p.paidOnUtc ? new Date(p.paidOnUtc).toLocaleDateString() : p.runStatus}
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <p className="font-bold text-[#0A0D14]">{fmt(p.netPay)}</p>
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        {p.disbursementStatus || 'Completed'}
+                      </span>
+                    </div>
+                    <ChevronRight size={16} className="text-[#94A3B8]" />
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
       )}
 
-      {/* Sub-tab 3: ACTIVITY */}
+      {/* ── Sub-tab 3: ACTIVITY ── */}
       {subTab === 'Activity' && (
-        <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-[#0A0D14]">Activity Log</h3>
+        <div className="space-y-3 text-xs">
           {activities.length === 0 ? (
-            <p className="text-xs text-[#94A3B8]">No activity recorded yet for this staff member.</p>
+            <p className="text-[#94A3B8] text-center py-8">No activity recorded yet</p>
           ) : (
-            <div className="space-y-3 text-xs">
-              {activities.map((act) => (
-                <div key={act.id} className="flex gap-3 pb-3 border-b border-[#F1F5F9]">
-                  <div className="w-2 h-2 rounded-full bg-[#0055FF] mt-1.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="font-medium text-[#0A0D14]">{act.summary || act.description || 'Activity logged'}</p>
-                    <p className="text-[11px] text-[#94A3B8] mt-0.5">
-                      {act.occurredOnUtc ? new Date(act.occurredOnUtc).toLocaleString() : ''}
-                    </p>
-                  </div>
-                  {act.category && (
-                    <span className="text-[10px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-full h-fit">
-                      {act.category}
-                    </span>
-                  )}
+            activities.map((act) => (
+              <div key={act.id} className="flex gap-3 py-2 border-b border-[#F1F5F9] last:border-0">
+                <div className="w-2 h-2 rounded-full bg-[#0055FF] mt-1.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[11px] text-[#64748B]">
+                    {act.occurredOnUtc ? new Date(act.occurredOnUtc).toLocaleString() : ''}
+                  </p>
+                  <p className="font-medium text-[#0A0D14] mt-0.5">{act.summary || act.description}</p>
                 </div>
-              ))}
-            </div>
+                {act.category && (
+                  <span className="text-[10px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-full h-fit">
+                    {act.category}
+                  </span>
+                )}
+              </div>
+            ))
           )}
         </div>
       )}
 
-      {/* Sub-tab 4: SETTINGS */}
+      {/* ── Sub-tab 4: SETTINGS ── */}
       {subTab === 'Settings' && (
-        <div className="space-y-6">
-          {/* Account Status */}
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-bold text-[#0A0D14]">Account Status</h3>
-            <div className="divide-y divide-[#F1F5F9] text-xs">
+        <div className="space-y-4 text-xs">
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-2">
+            <h3 className="font-bold text-[#0A0D14] mb-3">Account Status</h3>
+            <div className="divide-y divide-[#EAECF0]">
               <div className="flex justify-between py-2">
                 <span className="text-[#64748B]">App Login Status</span>
                 <span className="font-semibold text-emerald-600">{profile?.loginStatus || 'Active'}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-[#64748B]">Last Login</span>
-                <span className="font-semibold text-[#0A0D14]">
+                <span className="font-medium text-[#0A0D14]">
                   {profile?.lastLoginOnUtc ? new Date(profile.lastLoginOnUtc).toLocaleString() : 'Never'}
                 </span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-[#64748B]">Login Email</span>
-                <span className="font-semibold text-[#0A0D14]">{profile?.email || '—'}</span>
+                <span className="font-medium text-[#0A0D14]">{profile?.email || '—'}</span>
               </div>
             </div>
           </div>
 
-          {/* Role & Permissions */}
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-bold text-[#0A0D14]">Role & Permissions</h3>
-            <div className="divide-y divide-[#F1F5F9] text-xs">
-              <div className="flex justify-between py-2">
-                <span className="text-[#64748B]">Assigned Role</span>
-                <span className="font-semibold text-[#0055FF]">{profile?.roleName || profile?.role || 'Staff'}</span>
-              </div>
+          <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-4 space-y-3">
+            <h3 className="font-bold text-[#0A0D14]">Role & Permissions</h3>
+            <div className="flex justify-between py-2 border-b border-[#EAECF0]">
+              <span className="text-[#64748B]">Role</span>
+              <span className="font-semibold text-[#0A0D14]">{profile?.roleName || 'Custom'}</span>
             </div>
-            {profile?.permissions && profile.permissions.length > 0 && (
-              <div className="pt-2">
-                <p className="text-xs text-[#64748B] mb-2">Granted Permissions:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {profile.permissions.map((p: string) => (
-                    <span key={p} className="text-[10px] font-semibold text-[#0055FF] bg-[#EFF5FF] px-2 py-0.5 rounded-md">
-                      {p}
-                    </span>
-                  ))}
-                </div>
+            {profile?.permissions?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {profile.permissions.map((p: string) => (
+                  <span key={p} className="text-[10px] font-semibold text-[#0055FF] bg-[#EFF5FF] px-2 py-0.5 rounded-md">
+                    {p}
+                  </span>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Danger Zone */}
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 space-y-3">
-            <h3 className="text-sm font-bold text-rose-700">Danger Zone</h3>
-            <p className="text-xs text-rose-600">
-              Deactivating this staff member will immediately revoke their access to the Vintran app.
+          <div className="bg-[#FEF2F2] border border-[#FCA5A5] rounded-2xl p-4 space-y-3">
+            <h3 className="font-bold text-[#EF4444]">Danger Zone</h3>
+            <p className="text-[#64748B] text-xs">
+              This will revoke app access immediately. Historical financial and action records will be preserved.
             </p>
             <button
               type="button"
               onClick={handleDeactivate}
-              className="h-9 px-4 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
+              className="w-full h-11 rounded-xl bg-[#FEE2E2] text-[#EF4444] font-semibold text-xs hover:bg-rose-200 transition-colors"
             >
               Deactivate Staff Member
             </button>
@@ -908,26 +905,26 @@ function StaffProfileScreen({
         </div>
       )}
 
-      {/* ── Status Picker Modal ── */}
+      {/* Status Picker Modal */}
       {statusPickerOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[#0A0D14]">Set Staff Status</h2>
-              <button type="button" onClick={() => setStatusPickerOpen(false)} className="text-[#94A3B8] hover:text-[#0A0D14]">
+              <h2 className="text-base font-bold text-[#0A0D14]">Set Status</h2>
+              <button type="button" onClick={() => setStatusPickerOpen(false)} className="text-[#94A3B8]">
                 <X size={18} />
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 text-xs">
               {['Active', 'OnLeave', 'Suspended'].map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => handleSetStatus(st)}
-                  className="w-full py-2.5 px-3 rounded-xl border border-[#F1F5F9] hover:bg-[#EFF5FF] text-left text-xs font-semibold text-[#0A0D14] transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full py-3 px-3 rounded-xl border border-[#F1F5F9] hover:bg-[#EFF5FF] text-left font-semibold text-[#0A0D14] flex items-center justify-between cursor-pointer"
                 >
                   <span>{STATUS_STYLE[st]?.label || st}</span>
-                  {statusKey === st && <Check size={16} className="text-[#0055FF]" />}
+                  {profile?.status === st && <Check size={16} className="text-[#0055FF]" />}
                 </button>
               ))}
             </div>
@@ -935,33 +932,31 @@ function StaffProfileScreen({
         </div>
       )}
 
-      {/* ── Pay Staff Modal ── */}
-      {payStaffModalOpen && (
+      {/* Pay Staff Sheet */}
+      {payStaffSheetOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl text-xs">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[#0A0D14]">Pay Staff Member</h2>
-              <button type="button" onClick={() => setPayStaffModalOpen(false)} className="text-[#94A3B8] hover:text-[#0A0D14]">
-                <X size={20} />
+              <h2 className="text-base font-bold text-[#0A0D14]">Pay Staff</h2>
+              <button type="button" onClick={() => setPayStaffSheetOpen(false)} className="text-[#94A3B8]">
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-3 bg-[#EFF5FF] rounded-xl border border-[#BFDBFE] flex items-center justify-between text-xs">
-              <span className="text-[#64748B]">Staff Member:</span>
-              <span className="font-bold text-[#0A0D14]">{staffName}</span>
-            </div>
-
             {config ? (
-              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-[#64748B]">Configured Net Pay:</span>
-                  <span className="font-bold text-[#0055FF]">{fmt(netPayNow)}</span>
+              <div className="bg-[#EFF5FF] border border-[#DBEAFE] rounded-xl p-3.5 space-y-2">
+                <p className="font-bold text-[#0055FF]">Net Pay Summary</p>
+                <div className="flex justify-between text-[#64748B]">
+                  <span>Gross: {fmt((config.baseAmount || 0) + (config.totalAllowances || 0))}</span>
+                  <span>Deductions: -{fmt(config.totalDeductions)}</span>
+                </div>
+                <div className="border-t border-dashed border-[#DBEAFE] pt-2 flex justify-between font-bold text-[#0055FF]">
+                  <span>Take Home (Net)</span>
+                  <span>{fmt(netPayNow)}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-xl border border-amber-200">
-                No configured payroll — enter partial/custom amount to disburse.
-              </p>
+              <p className="text-[#94A3B8]">No payroll configured — specify an exact amount to pay.</p>
             )}
 
             {payPartialMode && (
@@ -969,50 +964,42 @@ function StaffProfileScreen({
                 label="Partial Amount (₦) *"
                 type="number"
                 value={partialAmount}
-                placeholder="Enter amount..."
+                placeholder="₦ amount"
                 onChange={(e) => setPartialAmount(e.target.value)}
-                required
               />
             )}
 
             <Input
-              label="Payment Notes / Description *"
+              label="Notes *"
               value={payNotes}
-              placeholder="e.g. July Bonus / Advance payment"
+              placeholder="Reason for payment..."
               onChange={(e) => setPayNotes(e.target.value)}
-              required
             />
 
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setPayPartialMode(!payPartialMode)}
-                className="text-xs"
-              >
-                {payPartialMode ? 'Use Full Pay' : 'Pay Partial'}
+            <div className="space-y-2 pt-2">
+              <Button fullWidth onClick={handlePay} disabled={paying}>
+                {paying ? 'Paying...' : payPartialMode ? `Pay ${fmt(Number(partialAmount) || 0)}` : `Pay ${fmt(netPayNow)}`}
               </Button>
               <Button
-                type="button"
-                onClick={handlePayStaff}
-                disabled={paying}
-                className="flex-1 text-xs"
+                fullWidth
+                variant="secondary"
+                onClick={() => setPayPartialMode(!payPartialMode)}
               >
-                {paying ? 'Disbursing...' : payPartialMode ? `Disburse ${fmt(Number(partialAmount) || 0)}` : `Disburse ${fmt(netPayNow)}`}
+                {payPartialMode ? 'Cancel Partial' : 'Pay Partial'}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Payroll Config Modal ── */}
-      {payrollConfigModalOpen && (
-        <PayrollConfigModal
+      {/* Payroll Config Sheet */}
+      {payrollConfigSheetOpen && (
+        <PayrollConfigSheet
           staffId={staffId}
           existing={config}
-          onClose={() => setPayrollConfigModalOpen(false)}
+          onClose={() => setPayrollConfigSheetOpen(false)}
           onSaved={() => {
-            setPayrollConfigModalOpen(false);
+            setPayrollConfigSheetOpen(false);
             loadProfileData();
           }}
         />
@@ -1049,84 +1036,82 @@ function PayrollTabContent({
   const pendingRun = history.find((r) => r.status === 'Draft' || r.status === 'Scheduled');
 
   return (
-    <div className="space-y-6">
-      {/* Pending / In-progress Payroll Card */}
+    <div className="space-y-4">
+      {/* Pending Run Card */}
       {pendingRun ? (
         <div
           onClick={onOpenRunPayroll}
-          className="bg-white border border-[#0055FF] rounded-2xl p-6 shadow-sm cursor-pointer hover:border-blue-600 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 cursor-pointer hover:border-[#0055FF] transition-colors space-y-3"
         >
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0055FF] bg-[#EFF5FF] px-2.5 py-0.5 rounded-full border border-[#BFDBFE]">
-              {pendingRun.status === 'Draft' ? 'Payroll in Progress' : 'Scheduled Run'}
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] font-bold text-[#64748B] tracking-wider uppercase">
+              {pendingRun.status === 'Draft' ? 'PAYROLL IN PROGRESS' : 'SCHEDULED PAYROLL'}
             </span>
-            <h3 className="text-xl font-bold text-[#0A0D14] mt-2">{fmt(pendingRun.totalNet)}</h3>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              {pendingRun.payPeriodLabel} • {pendingRun.staffCount || 0} staff members
-            </p>
+            <span
+              className={cn(
+                'text-[11px] font-semibold px-2.5 py-0.5 rounded-full',
+                PAYROLL_STATUS_STYLE[pendingRun.status]?.bg ?? 'bg-[#DBEAFE]',
+                PAYROLL_STATUS_STYLE[pendingRun.status]?.text ?? 'text-[#0055FF]'
+              )}
+            >
+              {PAYROLL_STATUS_STYLE[pendingRun.status]?.label ?? pendingRun.status}
+            </span>
           </div>
-          <button
-            type="button"
-            className="h-10 px-4 rounded-xl bg-[#0055FF] text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
-          >
-            Continue Payroll Run
-          </button>
+          <p className="text-2xl font-bold text-[#0055FF]">{fmt(pendingRun.totalNet)}</p>
+          <p className="text-xs text-[#64748B]">
+            {pendingRun.payPeriodLabel} • {pendingRun.staffCount || 0} staff members
+          </p>
         </div>
       ) : (
-        <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h3 className="text-base font-bold text-[#0A0D14]">Monthly Payroll Disbursal</h3>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              Automatically calculate salaries, bonuses, and deductions for all active staff.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenRunPayroll}
-            className="h-10 px-4 rounded-xl bg-[#0055FF] text-white text-xs font-semibold hover:bg-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <Plus size={16} />
-            <span>Run Payroll</span>
-          </button>
+        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-center text-xs text-[#64748B]">
+          No payroll run in progress
         </div>
       )}
 
-      {/* Payroll History */}
-      <div className="bg-white border border-[#F1F5F9] rounded-2xl p-5 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-[#0A0D14]">Payroll History</h3>
-        {loading ? (
-          <p className="text-xs text-[#64748B]">Loading history...</p>
-        ) : history.length === 0 ? (
-          <p className="text-xs text-[#94A3B8]">No past payroll runs recorded.</p>
-        ) : (
-          <div className="divide-y divide-[#F1F5F9]">
-            {history.map((h) => {
-              const statusStyle = PAYROLL_STATUS_STYLE[h.status] || {
-                label: h.status,
-                bg: 'bg-gray-50 border-gray-200',
-                text: 'text-gray-700',
-              };
+      {/* Run Payroll Primary Button */}
+      <button
+        type="button"
+        onClick={onOpenRunPayroll}
+        className="w-full h-12 rounded-xl bg-[#0055FF] text-white text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+      >
+        <span>{pendingRun ? 'Continue Payroll Run' : '+ Run Payroll'}</span>
+      </button>
 
-              return (
-                <div key={h.runId || h.id} className="py-3 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-semibold text-[#0A0D14]">{h.payPeriodLabel}</p>
-                    <p className="text-[11px] text-[#64748B]">
-                      {h.createdOnUtc ? new Date(h.createdOnUtc).toLocaleDateString() : ''} • {h.staffCount || 0} staff
-                    </p>
-                  </div>
-                  <div className="text-right flex items-center gap-3">
-                    <div>
-                      <p className="font-bold text-[#0A0D14]">{fmt(h.totalNet)}</p>
-                      <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full border', statusStyle.bg, statusStyle.text)}>
-                        {statusStyle.label}
-                      </span>
-                    </div>
-                  </div>
+      {/* Payroll History */}
+      <div className="space-y-3 pt-2">
+        <h3 className="text-sm font-semibold text-[#0A0D14]">Payroll History</h3>
+        {loading ? (
+          <div className="py-8 text-center text-xs text-[#64748B]">Loading payroll history...</div>
+        ) : history.length === 0 ? (
+          <div className="py-8 text-center text-xs text-[#94A3B8]">No payroll runs yet</div>
+        ) : (
+          history.map((h) => {
+            const statusStyle = PAYROLL_STATUS_STYLE[h.status] ?? {
+              label: h.status,
+              bg: 'bg-[#F1F5F9]',
+              text: 'text-[#64748B]',
+            };
+
+            return (
+              <div
+                key={h.runId || h.id}
+                className="py-3 flex justify-between items-center border-b border-[#F1F5F9] text-xs"
+              >
+                <div>
+                  <p className="font-semibold text-[#0A0D14]">{h.payPeriodLabel}</p>
+                  <p className="text-[11px] text-[#64748B] mt-0.5">
+                    {h.createdOnUtc ? new Date(h.createdOnUtc).toLocaleDateString() : ''} • {h.staffCount || 0} staff
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+                <div className="text-right">
+                  <p className="font-bold text-[#0A0D14]">{fmt(h.totalNet)}</p>
+                  <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block mt-1', statusStyle.bg, statusStyle.text)}>
+                    {statusStyle.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
@@ -1139,15 +1124,18 @@ function RunPayrollScreen({ onBack }: { onBack: () => void }) {
   const [runData, setRunData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [disbursing, setDisbursing] = useState(false);
+  const [disbursedSuccess, setDisbursedSuccess] = useState(false);
 
-  // Adjust Pay modal inside run
+  // Adjust modal
   const [adjustStaffId, setAdjustStaffId] = useState<string | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustNotes, setAdjustNotes] = useState('');
-  const [savingAdjust, setSavingAdjust] = useState(false);
 
-  const handleComputeRun = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Schedule modal
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+
+  const handleComputeRun = async () => {
     if (!payPeriodLabel.trim()) {
       toast.error('Pay period label is required');
       return;
@@ -1159,9 +1147,8 @@ function RunPayrollScreen({ onBack }: { onBack: () => void }) {
         defaultHoursForHourly: parseFloat(defaultHours) || 160,
       });
       setRunData(res.data || res);
-      toast.success('Payroll computed successfully');
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.description : 'Failed to compute payroll');
+      toast.error('Failed to compute payroll');
     } finally {
       setLoading(false);
     }
@@ -1172,21 +1159,16 @@ function RunPayrollScreen({ onBack }: { onBack: () => void }) {
     setDisbursing(true);
     try {
       await staffApi.disbursePayroll({ runId: runData.runId, mode: 'Automatic' });
-      toast.success('Payroll disbursed successfully!');
-      onBack();
+      setDisbursedSuccess(true);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.description : 'Failed to disburse payroll');
+      toast.error('Disbursal failed');
     } finally {
       setDisbursing(false);
     }
   };
 
   const handleSaveAdjust = async () => {
-    if (!runData?.runId || !adjustStaffId || !adjustAmount.trim() || !adjustNotes.trim()) {
-      toast.error('Amount and notes are required');
-      return;
-    }
-    setSavingAdjust(true);
+    if (!runData?.runId || !adjustStaffId || !adjustAmount.trim() || !adjustNotes.trim()) return;
     try {
       await staffApi.adjustPayrollItem({
         runId: runData.runId,
@@ -1194,146 +1176,228 @@ function RunPayrollScreen({ onBack }: { onBack: () => void }) {
         amount: Number(adjustAmount),
         notes: adjustNotes.trim(),
       });
-      toast.success('Payroll item adjusted');
+      toast.success('Adjustment saved');
       setAdjustStaffId(null);
-
-      // Reload run data
       const updated: any = await staffApi.getPayrollRun(runData.runId);
       setRunData(updated.data || updated);
     } catch (err) {
-      toast.error('Failed to adjust item');
-    } finally {
-      setSavingAdjust(false);
+      toast.error('Failed to adjust pay');
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-[#0A0D14] cursor-pointer"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <h1 className="text-xl font-bold text-[#0A0D14]">Run Payroll</h1>
-      </div>
+  const handleSchedule = async () => {
+    if (!runData?.runId || !scheduleDate.trim()) return;
+    try {
+      await staffApi.schedulePayroll({
+        runId: runData.runId,
+        scheduledForUtc: new Date(scheduleDate).toISOString(),
+        mode: 'Automatic',
+      });
+      toast.success('Payroll scheduled successfully');
+      setScheduleOpen(false);
+      onBack();
+    } catch (err) {
+      toast.error('Failed to schedule payroll');
+    }
+  };
 
-      {!runData ? (
-        <form onSubmit={handleComputeRun} className="bg-white border border-[#F1F5F9] rounded-2xl p-6 space-y-4 shadow-sm max-w-md">
-          <h2 className="text-base font-bold text-[#0A0D14]">Compute New Payroll Run</h2>
+  if (disbursedSuccess) {
+    return (
+      <div className="py-16 text-center space-y-4 max-w-md mx-auto">
+        <div className="w-20 h-20 rounded-full bg-[#22C55E] text-white font-bold text-4xl flex items-center justify-center mx-auto">
+          ✓
+        </div>
+        <h2 className="text-xl font-bold text-[#0A0D14]">Payroll Disbursed!</h2>
+        <p className="text-xs text-[#64748B]">
+          {fmt(runData?.totalNet)} sent to {runData?.items?.length || 0} staff Vintran wallets
+        </p>
+        <Button fullWidth onClick={onBack}>
+          Done
+        </Button>
+      </div>
+    );
+  }
+
+  if (!runData) {
+    return (
+      <div className="space-y-6 max-w-md mx-auto pb-12 text-xs">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onBack} className="p-1 text-[#0A0D14]">
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-lg font-bold text-[#0A0D14]">Run Payroll</h1>
+        </div>
+
+        <div className="space-y-4">
           <Input
-            label="Pay Period Label *"
+            label="Pay period label *"
+            placeholder="e.g. July 2026"
             value={payPeriodLabel}
-            placeholder="e.g. August 2026"
             onChange={(e) => setPayPeriodLabel(e.target.value)}
-            required
           />
           <Input
-            label="Default Monthly Target Hours (Hourly Staff)"
+            label="Default hours for hourly-paid staff"
             type="number"
             value={defaultHours}
             onChange={(e) => setDefaultHours(e.target.value)}
           />
-          <Button type="submit" fullWidth disabled={loading}>
-            {loading ? 'Computing...' : 'Compute Payroll'}
+          <Button fullWidth onClick={handleComputeRun} disabled={!payPeriodLabel.trim() || loading}>
+            {loading ? 'Computing…' : 'Compute Payroll'}
           </Button>
-        </form>
-      ) : (
-        <div className="space-y-6">
-          {/* Summary Card */}
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-[#64748B]">Total Gross Pay</p>
-              <p className="text-xl font-bold text-[#0A0D14] mt-1">{fmt(runData.totalGross)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#64748B]">Total Deductions</p>
-              <p className="text-xl font-bold text-rose-600 mt-1">-{fmt(runData.totalDeductions)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#64748B]">Total Net Disbursal</p>
-              <p className="text-xl font-bold text-[#0055FF] mt-1">{fmt(runData.totalNet)}</p>
-            </div>
-          </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Breakdown Table */}
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-[#F1F5F9] flex justify-between items-center">
-              <h3 className="text-sm font-bold text-[#0A0D14]">Staff Breakdown ({runData.items?.length || 0})</h3>
-            </div>
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[#64748B]">
-                <tr>
-                  <th className="py-3 px-4">Staff Member</th>
-                  <th className="py-3 px-4">Gross</th>
-                  <th className="py-3 px-4">Deductions</th>
-                  <th className="py-3 px-4">Net Pay</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F1F5F9]">
-                {(runData.items || []).map((item: any) => (
-                  <tr key={item.staffId}>
-                    <td className="py-3 px-4 font-semibold text-[#0A0D14]">{item.staffName || item.staffId}</td>
-                    <td className="py-3 px-4 text-[#64748B]">{fmt(item.grossPay)}</td>
-                    <td className="py-3 px-4 text-rose-600">-{fmt(item.deductions)}</td>
-                    <td className="py-3 px-4 font-bold text-[#0A0D14]">{fmt(item.netPay)}</td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAdjustStaffId(item.staffId);
-                          setAdjustAmount(String(item.netPay));
-                          setAdjustNotes('');
-                        }}
-                        className="text-[#0055FF] font-semibold hover:underline cursor-pointer"
-                      >
-                        Adjust
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+  const isDraft = runData.status === 'Draft';
 
-          {/* Actions */}
-          <div className="flex gap-4">
-            <Button variant="secondary" onClick={onBack}>
-              Cancel
-            </Button>
-            <Button onClick={handleDisburse} disabled={disbursing} className="flex-1">
-              {disbursing ? 'Disbursing Payments...' : `Disburse Now (${fmt(runData.totalNet)})`}
-            </Button>
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto pb-12 text-xs">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onBack} className="p-1 text-[#0A0D14]">
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-lg font-bold text-[#0A0D14]">Run Payroll</h1>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <h2 className="text-base font-bold text-[#0A0D14]">{runData.payPeriodLabel}</h2>
+        <span className="text-[10px] font-semibold text-[#0055FF] bg-[#DBEAFE] px-2 py-0.5 rounded-md">
+          {runData.status}
+        </span>
+      </div>
+
+      {/* Summary Card */}
+      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 space-y-3">
+        <div className="flex justify-between">
+          <div>
+            <p className="text-[11px] text-[#64748B]">Gross Payroll</p>
+            <p className="text-lg font-bold text-[#0A0D14]">{fmt(runData.totalGross)}</p>
           </div>
+          <div className="text-right">
+            <p className="text-[11px] text-[#64748B]">Total Deductions</p>
+            <p className="text-lg font-bold text-rose-600">-{fmt(runData.totalDeductions)}</p>
+          </div>
+        </div>
+        <div className="border-t border-[#E2E8F0] pt-3 flex justify-between items-center">
+          <div>
+            <p className="text-[11px] text-[#64748B]">Net Disbursement</p>
+            <p className="text-xl font-bold text-[#0055FF]">{fmt(runData.totalNet)}</p>
+          </div>
+          <span className="text-xs font-semibold text-white bg-[#0055FF] px-3 py-1 rounded-full">
+            {runData.items?.length || 0} staff
+          </span>
+        </div>
+      </div>
+
+      {/* Staff Breakdown List */}
+      <div className="space-y-3">
+        <h3 className="font-semibold text-[#0A0D14]">Staff Breakdown</h3>
+        <div className="divide-y divide-[#F1F5F9] border-t border-[#F1F5F9]">
+          {(runData.items || []).map((item: any) => (
+            <div key={item.staffId} className="py-3 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-[#EFF5FF] text-[#0055FF] font-bold flex items-center justify-center text-xs">
+                  {initials(item.staffName || '')}
+                </div>
+                <div>
+                  <p className="font-semibold text-[#0A0D14]">{item.staffName || item.staffId}</p>
+                  <p className="text-[11px] text-[#94A3B8]">
+                    Gross: {fmt(item.grossPay)} | Ded: {fmt(item.deductions)}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-[#0A0D14]">{fmt(item.netPay)}</p>
+                {isDraft && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdjustStaffId(item.staffId);
+                      setAdjustAmount(String(item.netPay));
+                      setAdjustNotes('');
+                    }}
+                    className="text-[#0055FF] font-semibold hover:underline mt-0.5"
+                  >
+                    Adjust
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Notice */}
+      <div className="flex items-center gap-2 text-xs text-[#64748B] bg-gray-50 p-3 rounded-xl">
+        <span>⚠️</span>
+        <span>Payments will be instantly disbursed to the linked Vintran wallets.</span>
+      </div>
+
+      {/* Bottom Actions */}
+      {runData.status !== 'Paid' && (
+        <div className="space-y-2 pt-2">
+          <Button fullWidth onClick={handleDisburse} disabled={disbursing}>
+            {disbursing ? 'Disbursing…' : `Disburse Now — ${fmt(runData.totalNet)}`}
+          </Button>
+          {isDraft && (
+            <button
+              type="button"
+              onClick={() => setScheduleOpen(true)}
+              className="w-full py-2.5 text-center font-semibold text-[#0055FF] hover:underline"
+            >
+              Schedule for Later
+            </button>
+          )}
         </div>
       )}
 
       {/* Adjust Modal */}
       {adjustStaffId && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl">
-            <h2 className="text-base font-bold text-[#0A0D14]">Adjust Staff Pay</h2>
+          <div className="bg-white rounded-2xl max-w-xs w-full p-6 space-y-3 shadow-xl text-xs">
+            <h3 className="font-bold text-[#0A0D14]">Adjust Pay</h3>
             <Input
-              label="Adjusted Net Pay (₦) *"
+              label="Amount (₦) *"
               type="number"
               value={adjustAmount}
               onChange={(e) => setAdjustAmount(e.target.value)}
             />
             <Input
-              label="Reason / Notes *"
+              label="Notes *"
               value={adjustNotes}
-              placeholder="e.g. Overtime bonus"
+              placeholder="Reason for adjustment..."
               onChange={(e) => setAdjustNotes(e.target.value)}
             />
-            <div className="flex gap-2">
-              <Button variant="secondary" fullWidth onClick={() => setAdjustStaffId(null)}>
+            <div className="flex gap-2 pt-2">
+              <Button fullWidth variant="secondary" onClick={() => setAdjustStaffId(null)}>
                 Cancel
               </Button>
-              <Button fullWidth onClick={handleSaveAdjust} disabled={savingAdjust}>
-                {savingAdjust ? 'Saving...' : 'Save Adjustment'}
+              <Button fullWidth onClick={handleSaveAdjust}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {scheduleOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xs w-full p-6 space-y-3 shadow-xl text-xs">
+            <h3 className="font-bold text-[#0A0D14]">Schedule for Later</h3>
+            <Input
+              label="Disbursement date & time *"
+              type="datetime-local"
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+            />
+            <div className="flex gap-2 pt-2">
+              <Button fullWidth variant="secondary" onClick={() => setScheduleOpen(false)}>
+                Cancel
+              </Button>
+              <Button fullWidth onClick={handleSchedule}>
+                Confirm Schedule
               </Button>
             </div>
           </div>
@@ -1347,26 +1411,16 @@ function RunPayrollScreen({ onBack }: { onBack: () => void }) {
 // ─── Sub-Tab / Screen 3: Shifts & Attendance Tab ──────────────────────────────
 // ───────────────────────────────────────────────────────────────────────────────
 
-function ShiftsTabContent({ staffList }: { staffList: any[] }) {
+function ShiftsTabContent({ safeStaffList }: { safeStaffList: any[] }) {
+  const myStaffId = safeStaffList[0]?.id;
   const [summary, setSummary] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [weekLog, setWeekLog] = useState<any[]>([]);
   const [liveSeconds, setLiveSeconds] = useState(0);
 
-  const myStaffId = staffList[0]?.id; // Default to first staff for demo
-
   useEffect(() => {
-    if (!myStaffId) {
-      setLoading(false);
-      return;
-    }
-    staffApi
-      .getAttendanceSummary(myStaffId)
-      .then((res: any) => {
-        const sum = res?.data ?? res;
-        setSummary(sum || null);
-      })
-      .catch(() => setSummary(null))
-      .finally(() => setLoading(false));
+    if (!myStaffId) return;
+    staffApi.getAttendanceSummary(myStaffId).then((res: any) => setSummary(res?.data ?? res));
+    staffApi.getAttendance(myStaffId).then((res: any) => setWeekLog(res?.data ?? res ?? []));
   }, [myStaffId]);
 
   useEffect(() => {
@@ -1377,103 +1431,158 @@ function ShiftsTabContent({ staffList }: { staffList: any[] }) {
     const startMs = new Date(summary.currentShiftStartedUtc).getTime();
     const tick = () => setLiveSeconds(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
     tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
   }, [summary?.isClockedIn, summary?.currentShiftStartedUtc]);
 
-  const formatTimer = (secs: number) => {
-    const hrs = Math.floor(secs / 3600);
-    const mins = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
+  const formatTimer = (totalSecs: number) => {
+    const hrs = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(hrs)}:${pad(mins)}:${pad(s)}`;
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
   };
 
-  const handleClockToggle = async () => {
+  const handleToggleClock = async () => {
     if (!myStaffId) return;
     try {
       if (summary?.isClockedIn) {
         await staffApi.clockOut({ staffId: myStaffId });
-        toast.success('Clocked out successfully');
+        toast.success('Clocked out successfully!');
       } else {
         await staffApi.clockIn(myStaffId);
-        toast.success('Clocked in successfully');
+        toast.success('Clocked in successfully!');
       }
       const updated: any = await staffApi.getAttendanceSummary(myStaffId);
       setSummary(updated?.data ?? updated);
+      const updatedLog: any = await staffApi.getAttendance(myStaffId);
+      setWeekLog(updatedLog?.data ?? updatedLog ?? []);
     } catch (err) {
       toast.error('Clock action failed');
     }
   };
 
+  const clockedIn = summary?.isClockedIn ?? false;
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Clock In/Out Live Card */}
-      <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 text-center space-y-4 shadow-sm max-w-md mx-auto">
-        <p className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Current Shift Status</p>
-        <div className="text-4xl font-extrabold text-[#0A0D14] tracking-tight">{formatTimer(liveSeconds)}</div>
+    <div className="space-y-4 max-w-lg mx-auto text-xs">
+      {/* Clock In / Out Card */}
+      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 text-center space-y-3">
+        {clockedIn && summary?.currentShiftStartedUtc && (
+          <div>
+            <p className="text-[11px] font-bold text-[#64748B] tracking-wider uppercase">CURRENT STATUS</p>
+            <p className="font-bold text-[#16A34A] mt-0.5">
+              Clocked In at {new Date(summary.currentShiftStartedUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        )}
+        <p className="text-4xl font-extrabold text-[#0A0D14] tracking-tight">{formatTimer(liveSeconds)}</p>
         <p className="text-xs text-[#64748B]">Active elapsed time today</p>
         <button
           type="button"
-          onClick={handleClockToggle}
+          onClick={handleToggleClock}
           className={cn(
-            'w-full py-3 rounded-xl font-bold text-sm text-white cursor-pointer transition-colors flex items-center justify-center gap-2 shadow-sm',
-            summary?.isClockedIn ? 'bg-rose-600 hover:bg-rose-700' : 'bg-[#0055FF] hover:bg-blue-700'
+            'w-full h-12 rounded-xl font-semibold text-white cursor-pointer transition-colors shadow-sm',
+            clockedIn ? 'bg-[#EF4444] hover:bg-rose-700' : 'bg-[#0055FF] hover:bg-blue-700'
           )}
         >
-          <Clock size={16} />
-          <span>{summary?.isClockedIn ? 'Clock Out' : 'Clock In'}</span>
+          {clockedIn ? 'Clock Out' : 'Clock In'}
         </button>
       </div>
 
-      {/* Roster / Shifts List */}
-      <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 shadow-sm space-y-4">
-        <h3 className="text-base font-bold text-[#0A0D14]">Store Employee Shift Roster</h3>
-        <div className="space-y-3">
-          {staffList.slice(0, 5).map((staff) => (
+      {/* Monthly Hours Card */}
+      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-[11px] font-bold text-[#64748B] tracking-wider uppercase">MONTHLY HOURS</span>
+          <span className="text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2.5 py-0.5 rounded-full">
+            ON TRACK
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-bold text-[#0A0D14]">August 2026</span>
+          <span className="font-bold text-[#059669]">{summary?.monthlyHoursWorked ?? 0}hrs</span>
+        </div>
+        {/* Progress bar */}
+        <div className="space-y-1">
+          <div className="h-2 bg-[#E2E8F0] rounded-full overflow-hidden">
             <div
-              key={staff.id}
-              className="p-3.5 rounded-xl border border-[#F1F5F9] bg-[#F8FAFC] flex items-center justify-between text-xs"
-            >
-              <div className="flex items-center gap-3">
-                <Clock size={18} className="text-[#0055FF]" />
+              className="h-full bg-[#059669] rounded-full transition-all duration-300"
+              style={{ width: `${Math.min(100, ((summary?.monthlyHoursWorked ?? 0) / (summary?.monthlyTargetHours || 160)) * 100)}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[11px] text-[#64748B]">
+            <span>0 hrs</span>
+            <span>{summary?.monthlyTargetHours ?? 160} hrs</span>
+          </div>
+        </div>
+      </div>
+
+      {/* This Week's Log */}
+      <div className="space-y-3 pt-2">
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold text-[#0A0D14]">This Week's Log</h3>
+        </div>
+        {weekLog.length === 0 ? (
+          <p className="text-[#94A3B8] text-center py-6">No shifts logged this week</p>
+        ) : (
+          weekLog.map((item) => {
+            const isOpen = !item.clockedOutUtc;
+            const hrs = item.hours ?? 0;
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  'bg-[#F8FAFC] rounded-xl p-3.5 flex justify-between items-center border-l-4',
+                  isOpen ? 'border-l-[#0055FF]' : 'border-l-[#16A34A]'
+                )}
+              >
                 <div>
                   <p className="font-bold text-[#0A0D14]">
-                    {staff.firstName} {staff.lastName}
+                    {new Date(item.clockedInUtc).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                   </p>
-                  <p className="text-[#64748B]">Shift: 08:00 AM – 05:00 PM</p>
+                  <p className="text-[11px] text-[#64748B]">
+                    {new Date(item.clockedInUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {isOpen ? ' (Active Shift)' : ` to ${new Date(item.clockedOutUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                  </p>
                 </div>
+                <p className="font-bold text-[#0A0D14]">
+                  {isOpen ? 'In Progress' : `${Math.floor(hrs)}h ${Math.round((hrs % 1) * 60)}m`}
+                </p>
               </div>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Clocked In
-              </span>
-            </div>
-          ))}
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// ─── Sub-Tab / Screen 4: 4-Step Add Staff Wizard Screen ────────────────────────
+// ─── Sub-Tab / Screen 4: Add Staff Flow Screen (4-Step Wizard) ────────────────
 // ───────────────────────────────────────────────────────────────────────────────
 
-function AddStaffWizardScreen({
+function AddStaffFlowScreen({
+  initialStep = 1,
   roles,
   onDone,
   onCancel,
 }: {
+  initialStep: number;
   roles: any[];
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [step, setStep] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(initialStep);
+  const [createdStaff, setCreatedStaff] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+    address?: string;
+    startDate: string;
+  } | null>(null);
 
-  // Form states
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  // Step 1: Personal Info
+  const [fullName, setFullName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -1482,6 +1591,7 @@ function AddStaffWizardScreen({
   const [employmentType, setEmploymentType] = useState('Full-Time');
   const [startDate, setStartDate] = useState('');
 
+  // Step 2: Identity & Banking
   const [govtIdType, setGovtIdType] = useState('NIN');
   const [idNumber, setIdNumber] = useState('');
   const [nextOfKinName, setNextOfKinName] = useState('');
@@ -1490,49 +1600,82 @@ function AddStaffWizardScreen({
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
 
-  const [selectedRoleId, setSelectedRoleId] = useState('');
+  // Step 3: Permissions
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
+  // Step 4: Payroll Setup
   const [payType, setPayType] = useState<'Salary' | 'Hourly'>('Salary');
   const [basePay, setBasePay] = useState('');
   const [payPeriod, setPayPeriod] = useState('Monthly');
+  const [firstRunOnUtc, setFirstRunOnUtc] = useState('');
+  const [allowances, setAllowances] = useState<{ name: string; amount: string }[]>([]);
+  const [deductions, setDeductions] = useState<{ name: string; amount: string }[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleComplete = async () => {
-    if (!firstName.trim() || !email.trim()) {
-      toast.error('First name and email are required');
+  const parseDateString = (s: string): string => {
+    if (!s) return new Date().toISOString().slice(0, 10);
+    const dmy = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmy) {
+      const [, d, mo, y] = dmy;
+      return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return s;
+  };
+
+  const handleCreate = async () => {
+    if (!basePay.trim()) {
+      toast.error('Base pay amount is required');
       return;
     }
+    const [firstName, ...rest] = fullName.trim().split(/\s+/);
+    const lastName = rest.join(' ') || firstName;
+    const [nokFirst, ...nokRest] = nextOfKinName.trim().split(/\s+/);
+    const selectedRole = roles?.find((r) => r.id === selectedRoleId);
+
     setSubmitting(true);
     try {
-      const created: any = await staffApi.create({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+      const res: any = await staffApi.create({
+        firstName,
+        lastName,
         jobTitle: jobTitle.trim(),
         phoneNumber: phone.trim(),
-        email: email.trim(),
+        email: email.trim() || undefined,
         employmentType: employmentType.replace('-', ''),
-        startDate: startDate || new Date().toISOString().slice(0, 10),
-        governmentIdType: govtIdType,
-        governmentIdNumber: idNumber.trim(),
-        nextOfKinFirstName: nextOfKinName.trim(),
-        nextOfKinContact: nextOfKinPhone.trim(),
-        bankName,
-        bankAccountNumber: accountNumber.trim(),
-        bankAccountName: accountName.trim(),
+        startDate: parseDateString(startDate),
+        permissions: selectedRole?.permissions ?? [],
+        dateOfBirth: dob ? parseDateString(dob) : undefined,
+        homeAddress: address.trim() || undefined,
+        governmentIdType: govtIdType || undefined,
+        governmentIdNumber: idNumber.trim() || undefined,
+        nextOfKinFirstName: nokFirst || undefined,
+        nextOfKinLastName: nokRest.join(' ') || undefined,
+        nextOfKinContact: nextOfKinPhone.trim() || undefined,
+        bankName: bankName || undefined,
+        bankAccountNumber: accountNumber.trim() || undefined,
+        bankAccountName: accountName.trim() || undefined,
         roleId: selectedRoleId || undefined,
       });
 
-      const staffId = created?.data?.id || created?.id;
-      if (staffId && basePay.trim()) {
+      const staffId = res?.data?.id || res?.id;
+      if (staffId) {
         await staffApi.setupPayroll({
           staffId,
           payType,
           baseAmount: Number(basePay) || 0,
           period: payPeriod,
+          allowances: allowances.filter((a) => a.name.trim() && a.amount.trim()).map((a) => ({ name: a.name.trim(), amount: Number(a.amount) || 0 })),
+          deductions: deductions.filter((d) => d.name.trim() && d.amount.trim()).map((d) => ({ name: d.name.trim(), amount: Number(d.amount) || 0 })),
+          firstRunOnUtc: firstRunOnUtc ? parseDateString(firstRunOnUtc) : undefined,
         });
       }
 
-      toast.success('Staff member created successfully!');
-      onDone();
+      setCreatedStaff({
+        name: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        address: address.trim() || undefined,
+        startDate: startDate.trim() || new Date().toLocaleDateString(),
+      });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.description : 'Failed to create staff member');
     } finally {
@@ -1540,223 +1683,201 @@ function AddStaffWizardScreen({
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-xl mx-auto pb-12">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={step > 1 ? () => setStep(step - 1) : onCancel}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-[#0A0D14] cursor-pointer"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-[#0A0D14]">Add Staff Member</h1>
-            <p className="text-xs text-[#64748B]">Step {step} of 4</p>
+  if (createdStaff) {
+    return (
+      <div className="py-16 text-center space-y-4 max-w-md mx-auto text-xs">
+        <div className="w-20 h-20 rounded-full bg-[#22C55E] text-white font-bold text-4xl flex items-center justify-center mx-auto shadow-md">
+          ✓
+        </div>
+        <h2 className="text-xl font-bold text-[#0A0D14]">Staff Created Successfully</h2>
+        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 text-left space-y-2.5">
+          <div className="flex justify-between py-1 border-b border-[#EAECF0]">
+            <span className="text-[#64748B]">Name</span>
+            <span className="font-semibold text-[#0A0D14]">{createdStaff.name}</span>
+          </div>
+          <div className="flex justify-between py-1 border-b border-[#EAECF0]">
+            <span className="text-[#64748B]">Phone Number</span>
+            <span className="font-semibold text-[#0A0D14]">{createdStaff.phone}</span>
+          </div>
+          {createdStaff.email && (
+            <div className="flex justify-between py-1 border-b border-[#EAECF0]">
+              <span className="text-[#64748B]">Email</span>
+              <span className="font-semibold text-[#0A0D14]">{createdStaff.email}</span>
+            </div>
+          )}
+          {createdStaff.address && (
+            <div className="flex justify-between py-1 border-b border-[#EAECF0]">
+              <span className="text-[#64748B]">Address</span>
+              <span className="font-semibold text-[#0A0D14]">{createdStaff.address}</span>
+            </div>
+          )}
+          <div className="flex justify-between py-1">
+            <span className="text-[#64748B]">Start Date</span>
+            <span className="font-semibold text-[#0A0D14]">{createdStaff.startDate}</span>
           </div>
         </div>
-        <button type="button" onClick={onCancel} className="text-xs font-semibold text-[#64748B] hover:text-[#0A0D14]">
+        <Button fullWidth onClick={onDone}>
+          Continue
+        </Button>
+      </div>
+    );
+  }
+
+  const stepTitles = ['Personal Info', 'Identity & Banking', 'Permissions', 'Payroll Setup'];
+
+  return (
+    <div className="space-y-6 max-w-lg mx-auto pb-12 text-xs">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => (step > 1 ? setStep(step - 1) : onCancel())} className="p-1 cursor-pointer">
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-lg font-bold text-[#0A0D14]">Add Staff Member</h1>
+        </div>
+        <button type="button" onClick={onCancel} className="text-[#64748B] hover:text-[#0A0D14] font-semibold cursor-pointer">
           Cancel
         </button>
       </div>
 
-      {/* Progress Bar */}
-      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div className="h-full bg-[#0055FF] transition-all duration-300" style={{ width: `${(step / 4) * 100}%` }} />
+      {/* Step Header */}
+      <div className="space-y-1">
+        <h2 className="font-bold text-[#0A0D14] text-sm">{stepTitles[step - 1]}</h2>
+        <p className="text-[11px] text-[#64748B]">Step {step} of 4</p>
+        <div className="h-1 bg-[#E2E8F0] rounded-full overflow-hidden mt-2">
+          <div className="h-full bg-[#0055FF] transition-all duration-300" style={{ width: `${(step / 4) * 100}%` }} />
+        </div>
       </div>
 
-      <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 space-y-4 shadow-sm">
-        {/* Step 1: Personal Info */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-[#0A0D14]">Personal Information</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="First Name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-              <Input label="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </div>
-            <Input label="Email Address *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <Input label="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <Input label="Job Title" value={jobTitle} placeholder="e.g. Cashier / Store Manager" onChange={(e) => setJobTitle(e.target.value)} />
-            <Button fullWidth onClick={() => setStep(2)}>
-              Next: Identity & Banking
-            </Button>
-          </div>
-        )}
+      {/* Step 1: Personal Info */}
+      {step === 1 && (
+        <div className="space-y-3.5">
+          <Input label="Full Legal Name *" placeholder="Enter full legal name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <Input label="Job Title *" placeholder="e.g. Store Manager, Cashier" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} required />
+          <Input label="Phone Number *" placeholder="+234 000 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+          <Input label="Email" type="email" placeholder="Enter email address" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input label="Date of Birth" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+          <Input label="Address" placeholder="Enter full address" value={address} onChange={(e) => setAddress(e.target.value)} />
+          <CustomSelect label="Employment Type *" options={EMPLOYMENT_TYPE_OPTIONS} value={employmentType} onChange={setEmploymentType} />
+          <Input label="Effective Start Date *" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
 
-        {/* Step 2: Identity & Banking */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-[#0A0D14]">Identity & Banking</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Govt ID Type" value={govtIdType} onChange={(e) => setGovtIdType(e.target.value)} />
-              <Input label="ID Number" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />
-            </div>
-            <Input label="Next of Kin Name" value={nextOfKinName} onChange={(e) => setNextOfKinName(e.target.value)} />
-            <Input label="Bank Name" value={bankName} onChange={(e) => setBankName(e.target.value)} />
-            <Input label="Account Number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
-            <Input label="Account Name" value={accountName} onChange={(e) => setAccountName(e.target.value)} />
-            <Button fullWidth onClick={() => setStep(3)}>
-              Next: Roles & Permissions
-            </Button>
-          </div>
-        )}
+          <Button
+            fullWidth
+            onClick={() => setStep(2)}
+            disabled={!fullName.trim() || !jobTitle.trim() || !phone.trim() || !startDate.trim()}
+            className="flex items-center justify-center gap-2 mt-4"
+          >
+            <span>Next</span>
+            <ArrowRight size={16} />
+          </Button>
+        </div>
+      )}
 
-        {/* Step 3: Permissions */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-[#0A0D14]">Assign Role</h2>
-            <p className="text-xs text-[#64748B]">Select a role to configure permissions for this staff member.</p>
-            <div className="space-y-2">
-              {roles.map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => setSelectedRoleId(r.id)}
-                  className={cn(
-                    'p-3.5 rounded-xl border text-xs cursor-pointer transition-colors flex items-center justify-between',
-                    selectedRoleId === r.id ? 'border-[#0055FF] bg-[#EFF5FF]' : 'border-[#F1F5F9] bg-[#F8FAFC]'
-                  )}
-                >
-                  <span className="font-semibold text-[#0A0D14]">{r.name}</span>
-                  {selectedRoleId === r.id && <Check size={16} className="text-[#0055FF]" />}
-                </div>
-              ))}
-            </div>
-            <Button fullWidth onClick={() => setStep(4)}>
-              Next: Payroll Setup
-            </Button>
-          </div>
-        )}
+      {/* Step 2: Identity & Banking */}
+      {step === 2 && (
+        <div className="space-y-3.5">
+          <CustomSelect label="Government ID Type" options={GOVT_ID_OPTIONS} value={govtIdType} onChange={setGovtIdType} />
+          <Input label="ID Number" placeholder="Enter ID Number" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} />
+          <Input label="Next of Kin Name" placeholder="Enter Name" value={nextOfKinName} onChange={(e) => setNextOfKinName(e.target.value)} />
+          <Input label="Next of Kin Phone" placeholder="+234 000 000 0000" value={nextOfKinPhone} onChange={(e) => setNextOfKinPhone(e.target.value)} />
+          <CustomSelect label="Bank Name" options={BANK_OPTIONS} value={bankName} onChange={setBankName} searchable placeholder="Select Nigerian bank..." />
+          <Input label="Account Number" placeholder="10-digit NUBAN number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+          <Input label="Account Name" placeholder="Name on the bank account" value={accountName} onChange={(e) => setAccountName(e.target.value)} />
 
-        {/* Step 4: Payroll Setup */}
-        {step === 4 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-[#0A0D14]">Payroll Setup</h2>
-            <div className="flex gap-4 text-xs font-semibold">
+          <div className="bg-[#EFF5FF] p-3.5 rounded-xl border border-[#BFDBFE] text-[#0055FF] flex items-start gap-2.5">
+            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              A secure Vintran business wallet will be created automatically for this staff member to receive automated payroll payments.
+            </p>
+          </div>
+
+          <Button fullWidth onClick={() => setStep(3)} className="flex items-center justify-center gap-2 mt-4">
+            <span>Next</span>
+            <ArrowRight size={16} />
+          </Button>
+        </div>
+      )}
+
+      {/* Step 3: Permissions */}
+      {step === 3 && (
+        <div className="space-y-3.5">
+          <div className="bg-[#EFF5FF] p-3.5 rounded-xl text-[#0055FF] flex items-start gap-2.5">
+            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+            <p className="leading-relaxed">Choose a role to grant its permissions:</p>
+          </div>
+
+          <div className="space-y-2">
+            {roles.length === 0 ? (
+              <p className="text-[#94A3B8] text-center py-6">No roles set up yet — this staff member will be created with default permissions.</p>
+            ) : (
+              roles.map((r) => {
+                const isSel = selectedRoleId === r.id;
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => setSelectedRoleId(isSel ? null : r.id)}
+                    className={cn(
+                      'p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-colors',
+                      isSel ? 'border-[#0055FF] bg-[#EFF5FF]' : 'border-[#E2E8F0] bg-[#F8FAFC] hover:bg-gray-100'
+                    )}
+                  >
+                    <div>
+                      <p className="font-semibold text-[#0A0D14]">{r.name}</p>
+                      <p className="text-[11px] text-[#64748B] mt-0.5">{r.permissions?.length || 0} permission(s)</p>
+                    </div>
+                    <div
+                      className={cn(
+                        'w-5 h-5 rounded-full border flex items-center justify-center transition-colors',
+                        isSel ? 'border-[#0055FF] bg-[#0055FF]' : 'border-[#CBD5E1]'
+                      )}
+                    >
+                      {isSel && <Check size={12} className="text-white" />}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <Button fullWidth onClick={() => setStep(4)} className="flex items-center justify-center gap-2 mt-4">
+            <span>Next</span>
+            <ArrowRight size={16} />
+          </Button>
+        </div>
+      )}
+
+      {/* Step 4: Payroll Setup */}
+      {step === 4 && (
+        <div className="space-y-3.5">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[#0A0D14]">Pay Type</label>
+            <div className="flex gap-4">
               <button
                 type="button"
                 onClick={() => setPayType('Salary')}
-                className={cn('flex-1 py-2 rounded-xl border', payType === 'Salary' ? 'bg-[#0055FF] text-white' : 'bg-gray-50')}
+                className={cn('flex-1 py-2.5 rounded-xl border font-semibold text-xs transition-colors cursor-pointer', payType === 'Salary' ? 'bg-[#0055FF] text-white border-[#0055FF]' : 'bg-gray-50 text-[#64748B] border-[#E2E8F0]')}
               >
                 Monthly Salary
               </button>
               <button
                 type="button"
                 onClick={() => setPayType('Hourly')}
-                className={cn('flex-1 py-2 rounded-xl border', payType === 'Hourly' ? 'bg-[#0055FF] text-white' : 'bg-gray-50')}
+                className={cn('flex-1 py-2.5 rounded-xl border font-semibold text-xs transition-colors cursor-pointer', payType === 'Hourly' ? 'bg-[#0055FF] text-white border-[#0055FF]' : 'bg-gray-50 text-[#64748B] border-[#E2E8F0]')}
               >
                 Hourly Rate
               </button>
             </div>
-            <Input label="Base Amount (₦) *" type="number" value={basePay} onChange={(e) => setBasePay(e.target.value)} required />
-            <Button fullWidth onClick={handleComplete} disabled={submitting}>
-              {submitting ? 'Creating Staff Member...' : 'Complete & Create Staff'}
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────────
-// ─── Shared Components & Modals ────────────────────────────────────────────────
-// ───────────────────────────────────────────────────────────────────────────────
-
-function PayrollConfigModal({
-  staffId,
-  existing,
-  onClose,
-  onSaved,
-}: {
-  staffId: string;
-  existing: any;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [payType, setPayType] = useState<'Salary' | 'Hourly'>(existing?.payType || 'Salary');
-  const [baseAmount, setBaseAmount] = useState(existing ? String(existing.baseAmount) : '');
-  const [period, setPeriod] = useState(existing?.period || 'Monthly');
-  const [allowances, setAllowances] = useState<{ name: string; amount: string }[]>(
-    existing?.allowances?.map((a: any) => ({ name: a.name, amount: String(a.amount) })) || []
-  );
-  const [deductions, setDeductions] = useState<{ name: string; amount: string }[]>(
-    existing?.deductions?.map((d: any) => ({ name: d.name, amount: String(d.amount) })) || []
-  );
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!baseAmount.trim()) {
-      toast.error('Base pay amount is required');
-      return;
-    }
-    setSaving(true);
-    try {
-      const body = {
-        staffId,
-        payType,
-        baseAmount: Number(baseAmount),
-        period,
-        allowances: allowances.map((a) => ({ name: a.name, amount: Number(a.amount) || 0 })),
-        deductions: deductions.map((d) => ({ name: d.name, amount: Number(d.amount) || 0 })),
-      };
-
-      if (existing) {
-        await staffApi.updatePayroll(body);
-      } else {
-        await staffApi.setupPayroll(body);
-      }
-
-      toast.success('Payroll configuration saved!');
-      onSaved();
-    } catch (err) {
-      toast.error('Failed to save configuration');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-[#0A0D14]">Payroll Configuration</h2>
-          <button type="button" onClick={onClose} className="text-[#94A3B8] hover:text-[#0A0D14]">
-            <X size={20} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSave} className="space-y-4 text-xs">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setPayType('Salary')}
-              className={cn('flex-1 py-2 rounded-xl border font-semibold', payType === 'Salary' ? 'bg-[#0055FF] text-white' : 'bg-gray-50')}
-            >
-              Monthly Salary
-            </button>
-            <button
-              type="button"
-              onClick={() => setPayType('Hourly')}
-              className={cn('flex-1 py-2 rounded-xl border font-semibold', payType === 'Hourly' ? 'bg-[#0055FF] text-white' : 'bg-gray-50')}
-            >
-              Hourly Rate
-            </button>
           </div>
 
-          <Input label="Base Pay Amount (₦) *" type="number" value={baseAmount} onChange={(e) => setBaseAmount(e.target.value)} required />
+          <Input label="Base Pay Amount *" placeholder="₦" value={basePay} onChange={(e) => setBasePay(e.target.value)} type="number" required />
+          <CustomSelect label="Pay Period *" options={PAY_PERIOD_OPTIONS} value={payPeriod} onChange={setPayPeriod} />
+          <Input label="First Run Date (optional)" type="date" value={firstRunOnUtc} onChange={(e) => setFirstRunOnUtc(e.target.value)} />
 
-          {/* Allowances */}
-          <div className="space-y-2">
+          {/* Dynamic Allowances */}
+          <div className="space-y-2 pt-1">
             <div className="flex justify-between items-center">
-              <label className="font-semibold text-[#0A0D14]">Allowances</label>
-              <button
-                type="button"
-                onClick={() => setAllowances([...allowances, { name: '', amount: '' }])}
-                className="text-[11px] font-bold text-[#0055FF]"
-              >
-                + Add Allowance
+              <span className="font-bold text-[#0A0D14]">Allowances</span>
+              <button type="button" onClick={() => setAllowances([...allowances, { name: '', amount: '' }])} className="text-[#0055FF] font-semibold text-xs cursor-pointer hover:underline">
+                + Add
               </button>
             </div>
             {allowances.map((a, idx) => (
@@ -1770,40 +1891,32 @@ function PayrollConfigModal({
                     copy[idx].name = e.target.value;
                     setAllowances(copy);
                   }}
-                  className="flex-1 px-3 py-2 border rounded-xl"
+                  className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
                 />
                 <input
                   type="number"
-                  placeholder="Amount ₦"
+                  placeholder="₦"
                   value={a.amount}
                   onChange={(e) => {
                     const copy = [...allowances];
                     copy[idx].amount = e.target.value;
                     setAllowances(copy);
                   }}
-                  className="w-28 px-3 py-2 border rounded-xl"
+                  className="w-24 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
                 />
-                <button
-                  type="button"
-                  onClick={() => setAllowances(allowances.filter((_, i) => i !== idx))}
-                  className="text-rose-500 font-bold px-1"
-                >
-                  ✕
+                <button type="button" onClick={() => setAllowances(allowances.filter((_, i) => i !== idx))} className="text-rose-600 font-bold px-1 cursor-pointer">
+                  ×
                 </button>
               </div>
             ))}
           </div>
 
-          {/* Deductions */}
-          <div className="space-y-2">
+          {/* Dynamic Deductions */}
+          <div className="space-y-2 pt-1">
             <div className="flex justify-between items-center">
-              <label className="font-semibold text-[#0A0D14]">Deductions</label>
-              <button
-                type="button"
-                onClick={() => setDeductions([...deductions, { name: '', amount: '' }])}
-                className="text-[11px] font-bold text-[#0055FF]"
-              >
-                + Add Deduction
+              <span className="font-bold text-[#0A0D14]">Deductions</span>
+              <button type="button" onClick={() => setDeductions([...deductions, { name: '', amount: '' }])} className="text-[#0055FF] font-semibold text-xs cursor-pointer hover:underline">
+                + Add
               </button>
             </div>
             {deductions.map((d, idx) => (
@@ -1817,43 +1930,207 @@ function PayrollConfigModal({
                     copy[idx].name = e.target.value;
                     setDeductions(copy);
                   }}
-                  className="flex-1 px-3 py-2 border rounded-xl"
+                  className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
                 />
                 <input
                   type="number"
-                  placeholder="Amount ₦"
+                  placeholder="₦"
                   value={d.amount}
                   onChange={(e) => {
                     const copy = [...deductions];
                     copy[idx].amount = e.target.value;
                     setDeductions(copy);
                   }}
-                  className="w-28 px-3 py-2 border rounded-xl"
+                  className="w-24 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
                 />
-                <button
-                  type="button"
-                  onClick={() => setDeductions(deductions.filter((_, i) => i !== idx))}
-                  className="text-rose-500 font-bold px-1"
-                >
-                  ✕
+                <button type="button" onClick={() => setDeductions(deductions.filter((_, i) => i !== idx))} className="text-rose-600 font-bold px-1 cursor-pointer">
+                  ×
                 </button>
               </div>
             ))}
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" fullWidth disabled={saving}>
-              {saving ? 'Saving...' : 'Save Configuration'}
-            </Button>
+          <Button fullWidth onClick={handleCreate} disabled={!basePay.trim() || submitting} className="mt-4">
+            {submitting ? 'Creating Staff Member…' : 'Create Staff'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// ─── Sub-Tab / Screen 5: Payroll Config Sheet Component ────────────────────────
+// ───────────────────────────────────────────────────────────────────────────────
+
+function PayrollConfigSheet({
+  staffId,
+  existing,
+  onClose,
+  onSaved,
+}: {
+  staffId: string;
+  existing?: any;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [payType, setPayType] = useState<'Salary' | 'Hourly'>(existing?.payType || 'Salary');
+  const [baseAmount, setBaseAmount] = useState(existing ? String(existing.baseAmount) : '');
+  const [period, setPeriod] = useState(existing?.period || 'Monthly');
+  const [allowances, setAllowances] = useState<{ name: string; amount: string }[]>(
+    existing?.allowances?.map((a: any) => ({ name: a.name, amount: String(a.amount) })) || []
+  );
+  const [deductions, setDeductions] = useState<{ name: string; amount: string }[]>(
+    existing?.deductions?.map((d: any) => ({ name: d.name, amount: String(d.amount) })) || []
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!baseAmount.trim()) return;
+    setIsSaving(true);
+    try {
+      const body = {
+        staffId,
+        payType,
+        baseAmount: Number(baseAmount),
+        period,
+        allowances: allowances.filter((a) => a.name.trim() && a.amount.trim()).map((a) => ({ name: a.name.trim(), amount: Number(a.amount) || 0 })),
+        deductions: deductions.filter((d) => d.name.trim() && d.amount.trim()).map((d) => ({ name: d.name.trim(), amount: Number(d.amount) || 0 })),
+      };
+
+      if (existing) {
+        await staffApi.updatePayroll(body);
+      } else {
+        await staffApi.setupPayroll(body);
+      }
+      toast.success('Payroll configuration saved!');
+      onSaved();
+    } catch (err) {
+      toast.error('Failed to save config');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl text-xs max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-[#0A0D14]">{existing ? 'Edit Payroll Configuration' : 'Set Up Payroll'}</h2>
+          <button type="button" onClick={onClose} className="text-[#94A3B8]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPayType('Salary')}
+            className={cn('flex-1 py-2 rounded-full font-semibold border', payType === 'Salary' ? 'bg-[#0055FF] text-white' : 'bg-[#F1F5F9] text-[#64748B]')}
+          >
+            Monthly Salary
+          </button>
+          <button
+            type="button"
+            onClick={() => setPayType('Hourly')}
+            className={cn('flex-1 py-2 rounded-full font-semibold border', payType === 'Hourly' ? 'bg-[#0055FF] text-white' : 'bg-[#F1F5F9] text-[#64748B]')}
+          >
+            Hourly Rate
+          </button>
+        </div>
+
+        <Input label="Base Salary *" placeholder="₦" value={baseAmount} onChange={(e) => setBaseAmount(e.target.value)} type="number" />
+        <CustomSelect label="Pay Period" options={PAY_PERIOD_OPTIONS} value={period} onChange={setPeriod} />
+
+        {/* Dynamic Allowances */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="font-bold text-[#0A0D14]">Allowances</span>
+            <button type="button" onClick={() => setAllowances([...allowances, { name: '', amount: '' }])} className="text-[#0055FF] font-semibold">
+              + Add Allowance
+            </button>
           </div>
-        </form>
+          {allowances.map((a, idx) => (
+            <div key={idx} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Name"
+                value={a.name}
+                onChange={(e) => {
+                  const copy = [...allowances];
+                  copy[idx].name = e.target.value;
+                  setAllowances(copy);
+                }}
+                className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
+              />
+              <input
+                type="number"
+                placeholder="₦"
+                value={a.amount}
+                onChange={(e) => {
+                  const copy = [...allowances];
+                  copy[idx].amount = e.target.value;
+                  setAllowances(copy);
+                }}
+                className="w-24 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
+              />
+              <button type="button" onClick={() => setAllowances(allowances.filter((_, i) => i !== idx))} className="text-rose-600 font-bold px-1">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Dynamic Deductions */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="font-bold text-[#0A0D14]">Deductions</span>
+            <button type="button" onClick={() => setDeductions([...deductions, { name: '', amount: '' }])} className="text-[#0055FF] font-semibold">
+              + Add Deduction
+            </button>
+          </div>
+          {deductions.map((d, idx) => (
+            <div key={idx} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Name"
+                value={d.name}
+                onChange={(e) => {
+                  const copy = [...deductions];
+                  copy[idx].name = e.target.value;
+                  setDeductions(copy);
+                }}
+                className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
+              />
+              <input
+                type="number"
+                placeholder="₦"
+                value={d.amount}
+                onChange={(e) => {
+                  const copy = [...deductions];
+                  copy[idx].amount = e.target.value;
+                  setDeductions(copy);
+                }}
+                className="w-24 px-3 py-2 border border-[#E2E8F0] rounded-xl text-xs"
+              />
+              <button type="button" onClick={() => setDeductions(deductions.filter((_, i) => i !== idx))} className="text-rose-600 font-bold px-1">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <Button fullWidth onClick={handleSave} disabled={!baseAmount.trim() || isSaving}>
+          {isSaving ? 'Saving…' : 'Save'}
+        </Button>
       </div>
     </div>
   );
 }
+
+// ───────────────────────────────────────────────────────────────────────────────
+// ─── Sub-Tab / Screen 6: Monthly Payslip Receipt Screen ────────────────────────
+// ───────────────────────────────────────────────────────────────────────────────
 
 function PayslipReceiptScreen({
   runId,
@@ -1875,53 +2152,39 @@ function PayslipReceiptScreen({
       .finally(() => setLoading(false));
   }, [runId, staffId]);
 
-  if (loading) {
-    return <div className="py-20 text-center text-sm text-[#64748B]">Loading payslip receipt...</div>;
-  }
-
-  if (!payslip) {
-    return (
-      <div className="py-12 text-center space-y-3">
-        <p className="text-sm text-[#64748B]">Payslip record unavailable.</p>
-        <Button variant="secondary" onClick={onBack}>
-          Back
-        </Button>
-      </div>
-    );
+  if (loading || !payslip) {
+    return <div className="py-20 text-center text-xs text-[#64748B]">Loading payslip receipt...</div>;
   }
 
   return (
-    <div className="space-y-6 max-w-md mx-auto pb-12">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 text-[#0A0D14] cursor-pointer"
-        >
-          <ArrowLeft size={18} />
+    <div className="space-y-6 max-w-md mx-auto pb-12 text-xs">
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={onBack} className="p-1">
+          <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold text-[#0A0D14]">Payslip Receipt</h1>
+        <h1 className="text-base font-bold text-[#0A0D14]">Payslip Receipt</h1>
+        <div className="w-5" />
       </div>
 
-      <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 space-y-6 shadow-sm text-xs">
+      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 space-y-4">
         <div className="text-center space-y-1">
-          <h2 className="text-base font-bold text-[#0A0D14]">Official Payslip</h2>
-          <p className="text-[#64748B]">{payslip.payPeriodLabel}</p>
-          <span className="inline-block mt-2 font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
-            {payslip.runStatus || 'Disbursed'}
+          <h2 className="text-lg font-bold text-[#0A0D14]">Payslip</h2>
+          <p className="text-xs text-[#64748B]">Period: {payslip.payPeriodLabel}</p>
+          <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full mt-1">
+            Disbursed / Paid
           </span>
         </div>
 
-        {/* Breakdown */}
-        <div className="space-y-2 border-t border-[#F1F5F9] pt-4">
-          <p className="font-bold text-[#0A0D14]">Earnings Breakdown</p>
-          <div className="flex justify-between py-1 text-[#64748B]">
-            <span>Base Salary</span>
+        {/* Earnings Breakdown */}
+        <div className="space-y-2 border-t border-[#E2E8F0] pt-3">
+          <p className="font-bold text-[#64748B] text-[11px]">EARNINGS BREAKDOWN</p>
+          <div className="flex justify-between py-1">
+            <span className="text-[#64748B]">Base Salary</span>
             <span className="font-semibold text-[#0A0D14]">{fmt(payslip.baseSalary)}</span>
           </div>
           {(payslip.allowances || []).map((a: any, i: number) => (
-            <div key={i} className="flex justify-between py-1 text-[#64748B]">
-              <span>{a.name}</span>
+            <div key={i} className="flex justify-between py-1">
+              <span className="text-[#64748B]">{a.name}</span>
               <span className="font-semibold text-[#0A0D14]">{fmt(a.amount)}</span>
             </div>
           ))}
@@ -1931,8 +2194,9 @@ function PayslipReceiptScreen({
           </div>
         </div>
 
-        <div className="space-y-2 border-t border-[#F1F5F9] pt-4">
-          <p className="font-bold text-[#0A0D14]">Deductions</p>
+        {/* Deductions Breakdown */}
+        <div className="space-y-2 border-t border-[#E2E8F0] pt-3">
+          <p className="font-bold text-[#64748B] text-[11px]">DEDUCTIONS</p>
           {(payslip.deductions || []).map((d: any, i: number) => (
             <div key={i} className="flex justify-between py-1 text-rose-600">
               <span>{d.name}</span>
@@ -1945,15 +2209,24 @@ function PayslipReceiptScreen({
           </div>
         </div>
 
-        {/* Take Home Card */}
-        <div className="bg-[#EFF5FF] border border-[#BFDBFE] rounded-xl p-4 flex items-center justify-between">
-          <span className="font-bold text-[#0055FF]">Net Take-Home Pay</span>
-          <span className="text-xl font-bold text-[#0055FF]">{fmt(payslip.netPay)}</span>
+        {/* Net Take Home Card */}
+        <div className="bg-[#DBEAFE] rounded-xl p-4 flex justify-between items-center text-[#0055FF]">
+          <span className="font-bold">NET TAKE-HOME PAY</span>
+          <span className="text-xl font-bold">{fmt(payslip.netPay)}</span>
         </div>
 
-        <Button fullWidth variant="secondary" onClick={onBack}>
-          Close Receipt
-        </Button>
+        <div className="space-y-2 pt-2 border-t border-[#E2E8F0]">
+          <div className="flex justify-between py-1">
+            <span className="text-[#64748B]">Payment Method</span>
+            <span className="font-semibold text-[#0055FF]">Vintran Wallet (Auto-Disbursed)</span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-[#64748B]">Disbursement Date</span>
+            <span className="font-semibold text-[#0A0D14]">
+              {payslip.paidOnUtc ? new Date(payslip.paidOnUtc).toLocaleDateString() : 'Not yet disbursed'}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/src/store/authStore';
 import { useMe } from '@/src/hooks/useMe';
 import { authApi, businessApi, usersApi } from '@/src/lib/api/auth';
+import { notificationPreferencesApi } from '@/src/lib/api/commerce';
 import { ApiError } from '@/src/lib/api/client';
 import { toast } from 'sonner';
 import { Button } from '@/src/components/ui/Button';
@@ -34,6 +35,98 @@ type SubView =
   | 'sessions'
   | 'two-factor'
   | 'change-password';
+
+// ─── Notifications Sub-view ───────────────────────────────────────────────────
+
+const ALL_TRIGGERS: { trigger: string; label: string }[] = [
+  { trigger: 'LowStockAlert', label: 'Low stock alert' },
+  { trigger: 'GoodsReceived', label: 'Goods received' },
+  { trigger: 'StockTransferCompleted', label: 'Stock transfer completed' },
+  { trigger: 'MarketplaceSaleRecorded', label: 'Marketplace sale recorded' },
+  { trigger: 'MarketplaceQuantityAutoAdjusted', label: 'Marketplace quantity auto-adjusted' },
+  { trigger: 'PayrollScheduled', label: 'Payroll scheduled' },
+  { trigger: 'PayrollDisbursed', label: 'Payroll disbursed' },
+  { trigger: 'DebtDueReminder', label: 'Debt due reminder' },
+  { trigger: 'SupplierOrderStatusChanged', label: 'Supplier order status changed' },
+  { trigger: 'SupplierCancellationPending', label: 'Supplier cancellation pending' },
+  { trigger: 'CustomerBenefitGranted', label: 'Customer benefit granted' },
+  { trigger: 'VintranLinkReceived', label: 'Vintran link received' },
+  { trigger: 'PurchaseOrderRaised', label: 'Purchase order raised' },
+  { trigger: 'PartnerIntegrationStalled', label: 'Partner integration stalled' },
+];
+
+function NotificationsSubView() {
+  const [preferences, setPreferences] = useState<{ trigger: string; enabled: boolean }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const fetchPreferences = useCallback(async () => {
+    try {
+      const res: any = await notificationPreferencesApi.getMine();
+      const raw = res.data ?? res ?? [];
+      setPreferences(Array.isArray(raw) ? raw : []);
+    } catch {
+      setPreferences([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchPreferences(); }, [fetchPreferences]);
+
+  const isEnabled = (trigger: string) => {
+    const pref = preferences.find(p => p.trigger === trigger);
+    return pref?.enabled ?? true; // default on
+  };
+
+  const handleToggle = async (trigger: string, value: boolean) => {
+    setUpdating(trigger);
+    setPreferences(prev => {
+      const existing = prev.find(p => p.trigger === trigger);
+      if (existing) return prev.map(p => p.trigger === trigger ? { ...p, enabled: value } : p);
+      return [...prev, { trigger, enabled: value }];
+    });
+    try {
+      await notificationPreferencesApi.updateMine({ trigger, enabled: value });
+    } catch (err) {
+      // revert on failure
+      setPreferences(prev => prev.map(p => p.trigger === trigger ? { ...p, enabled: !value } : p));
+      toast.error(err instanceof ApiError ? err.description : 'Failed to update preference');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-10 text-sm text-[#64748B]">Loading preferences...</div>;
+  }
+
+  return (
+    <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl overflow-hidden divide-y divide-[#E2E8F0]">
+      {ALL_TRIGGERS.map(({ trigger, label }) => (
+        <div key={trigger} className="flex items-center justify-between px-4 py-4">
+          <span className="text-sm font-medium text-[#0A0D14] flex-1 mr-4">{label}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isEnabled(trigger)}
+            disabled={updating === trigger}
+            onClick={() => handleToggle(trigger, !isEnabled(trigger))}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+              isEnabled(trigger) ? 'bg-[#0055FF]' : 'bg-[#CBD5E1]'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${
+                isEnabled(trigger) ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -432,17 +525,7 @@ export default function SettingsPage() {
       {subView === 'notifications' && (
         <div>
           <SubHeader title="Notification Preferences" />
-          <div className="bg-white border border-[#F1F5F9] rounded-2xl p-6 space-y-4">
-            <p className="text-sm text-[#64748B]">
-              Configure how you receive updates and inventory alerts.
-            </p>
-            {['Email notifications for low stock', 'Daily sales summary email', 'Push notifications for orders'].map((pref, idx) => (
-              <label key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-[#F8FAFC] cursor-pointer hover:bg-gray-100">
-                <input type="checkbox" defaultChecked className="rounded border-gray-300 text-brand focus:ring-brand w-4 h-4" />
-                <span className="text-sm font-medium text-[#0A0D14]">{pref}</span>
-              </label>
-            ))}
-          </div>
+          <NotificationsSubView />
         </div>
       )}
 

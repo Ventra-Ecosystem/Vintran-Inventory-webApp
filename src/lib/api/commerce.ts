@@ -99,7 +99,7 @@ export const salesApi = {
     apiClient.post(`/api/sales/${id}/assign-location`, { locationId }),
 
   confirmDispatch: (id: string) =>
-    apiClient.post(`/api/sales/${id}/dispatch`),
+    apiClient.post(`/api/sales/${id}/confirm-dispatch`),
 
   getReport: (from: string, to: string) =>
     apiClient.get(`/api/reports/sales?from=${from}&to=${to}`),
