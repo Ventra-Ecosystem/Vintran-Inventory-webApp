@@ -40,8 +40,7 @@ type SubScreen =
   | { type: 'list' }
   | { type: 'createCategory' }
   | { type: 'categoryDetail'; category: Category }
-  | { type: 'createSubcategory'; category: Category }
-  | { type: 'success'; name: string; isSubcategory?: boolean; parentCategory?: Category };
+  | { type: 'createSubcategory'; category: Category };
 
 interface CategoriesTabProps {
   /** Called after a category is successfully created (optional — used by the parent page for success toasts). */
@@ -405,6 +404,7 @@ export function CategoriesTab({ onSuccess }: CategoriesTabProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [subScreen, setSubScreen] = useState<SubScreen>({ type: 'list' });
+  const [successData, setSuccessData] = useState<{ name: string; isSub: boolean; parent?: Category } | null>(null);
 
   // ── Create category form state
   const [catName, setCatName] = useState('');
@@ -500,7 +500,8 @@ export function CategoriesTab({ onSuccess }: CategoriesTabProps) {
       if (onSuccess) {
         onSuccess(name);
       } else {
-        setSubScreen({ type: 'success', name });
+        setSubScreen({ type: 'list' });
+        setSuccessData({ name, isSub: false });
       }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.description : 'Failed to create category');
@@ -518,67 +519,7 @@ export function CategoriesTab({ onSuccess }: CategoriesTabProps) {
       .map((c) => ({ label: c.name, value: c.id })),
   ];
 
-  // ── Success sub-screen ────────────────────────────────────────────────────
 
-  if (subScreen.type === 'success') {
-    const goCreateAnother = () => {
-      if (subScreen.isSubcategory && subScreen.parentCategory) {
-        setSubScreen({ type: 'createSubcategory', category: subScreen.parentCategory });
-      } else if (subScreen.isSubcategory) {
-        setSubScreen({ type: 'list' });
-      } else {
-        setSubScreen({ type: 'createCategory' });
-      }
-    };
-    const goBack = () => {
-      if (subScreen.isSubcategory && subScreen.parentCategory) {
-        setSubScreen({ type: 'categoryDetail', category: subScreen.parentCategory });
-      } else {
-        setSubScreen({ type: 'list' });
-      }
-    };
-
-    return (
-      <div className="flex flex-col items-center justify-center py-16 space-y-6 pb-16">
-        {/* Back button */}
-        <div className="w-full">
-          <SubScreenHeader
-            title="Success"
-            onBack={goBack}
-          />
-        </div>
-        {/* Matches the mobile SuccessScreen look */}
-        <div className="flex flex-col items-center text-center gap-3">
-          {/* Blue checkmark circle */}
-          <div className="w-24 h-24 rounded-full bg-[#EFF5FF] flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-[#0055FF] flex items-center justify-center">
-              <Check size={32} className="text-white" strokeWidth={3} />
-            </div>
-          </div>
-          <h2 className="text-xl font-bold text-[#0A0D14] mt-2">
-            {subScreen.name} created successfully
-          </h2>
-          <p className="text-sm text-[#64748B]">
-            Your {subScreen.isSubcategory ? 'subcategory' : 'category'} has been successfully created
-          </p>
-        </div>
-        <div className="w-full max-w-xs space-y-3">
-          <Button fullWidth size="lg" onClick={goCreateAnother} className="cursor-pointer">
-            Create another
-          </Button>
-          <Button
-            fullWidth
-            size="lg"
-            variant="secondary"
-            onClick={goBack}
-            className="cursor-pointer"
-          >
-            {subScreen.isSubcategory ? 'Back to category' : 'Back to categories'}
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   // ── Create Category form sub-screen ──────────────────────────────────────
 
@@ -633,7 +574,8 @@ export function CategoriesTab({ onSuccess }: CategoriesTabProps) {
         onBack={() => setSubScreen({ type: 'categoryDetail', category: cat })}
         onSuccess={(name) => {
           fetchCategories();
-          setSubScreen({ type: 'success', name, isSubcategory: true, parentCategory: cat });
+          setSubScreen({ type: 'categoryDetail', category: cat });
+          setSuccessData({ name, isSub: true, parent: cat });
         }}
       />
     );
@@ -800,6 +742,45 @@ export function CategoriesTab({ onSuccess }: CategoriesTabProps) {
           {deleteWorking ? 'Deleting…' : 'Delete category'}
         </Button>
       </Sheet>
+
+      {/* ── Success Modal ─────────────────────────────────────────────── */}
+      <Modal isOpen={!!successData} onClose={() => setSuccessData(null)}>
+        {successData && (
+          <SuccessScreen
+            standalone={false}
+            title={`${successData.name} created successfully`}
+            subtitle={`Your ${successData.isSub ? 'subcategory' : 'category'} has been successfully created`}
+            primaryAction={
+              <Button
+                type="button"
+                fullWidth
+                size="lg"
+                onClick={() => {
+                  if (successData.isSub && successData.parent) {
+                    setSubScreen({ type: 'createSubcategory', category: successData.parent });
+                  } else {
+                    setSubScreen({ type: 'createCategory' });
+                  }
+                  setSuccessData(null);
+                }}
+              >
+                Create another
+              </Button>
+            }
+            secondaryAction={
+              <Button
+                type="button"
+                fullWidth
+                size="lg"
+                variant="secondary"
+                onClick={() => setSuccessData(null)}
+              >
+                {successData.isSub ? 'Back to category' : 'Back to categories'}
+              </Button>
+            }
+          />
+        )}
+      </Modal>
     </>
   );
 }
