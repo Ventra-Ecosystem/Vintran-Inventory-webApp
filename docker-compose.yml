@@ -1,0 +1,52 @@
+version: "3.9"
+
+# ─── Vintran Inventory Web App — Docker Compose ───────────────────────────────
+# Runs the Next.js web app in production mode.
+#
+# Usage:
+#   docker compose up --build          # build image and start
+#   docker compose up -d               # start in detached / background mode
+#   docker compose down                # stop and remove containers
+#
+# Override any variable without editing this file:
+#   NEXT_PUBLIC_API_URL=http://my-server:5100 docker compose up --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  vintran-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass build-time args so NEXT_PUBLIC_* are baked into the JS bundle.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://89.168.123.9:5100}
+        NEXT_SERVER_API_URL: ${NEXT_SERVER_API_URL:-http://89.168.123.9:5100}
+        NODE_ENV: ${NODE_ENV:-production}
+    container_name: vintran-web
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8081}:8081"        # Next.js server (matches npm start -p 8081)
+    environment:
+      # ── API / Backend ─────────────────────────────────────────────────────
+      # Public URL used by the browser to reach the API.
+      # Use /api-proxy when the backend is HTTP and the app is served over HTTPS
+      # (avoids mixed-content browser errors — Next.js will proxy it server-side).
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://89.168.123.9:5100}
+
+      # Private server-side URL — used by Next.js rewrites() to proxy /api-proxy/*.
+      # Set this to the real backend address when NEXT_PUBLIC_API_URL=/api-proxy.
+      - NEXT_SERVER_API_URL=${NEXT_SERVER_API_URL:-http://89.168.123.9:5100}
+
+      # ── Next.js runtime ───────────────────────────────────────────────────
+      - NODE_ENV=${NODE_ENV:-production}
+      - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED:-1}
+      - PORT=8081
+      - HOSTNAME=0.0.0.0
+
+    networks:
+      - vintran-net
+
+# ─── Networks ────────────────────────────────────────────────────────────────
+networks:
+  vintran-net:
+    driver: bridge

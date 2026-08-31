@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'standalone',   // Enables minimal Docker image (no node_modules at runtime)
 
   turbopack: {
     rules: {

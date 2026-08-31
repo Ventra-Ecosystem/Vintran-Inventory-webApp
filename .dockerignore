@@ -1,0 +1,39 @@
+# ─── Vintran Inventory Web App — .dockerignore ───────────────────────────────
+# Excludes files from the Docker build context to keep image size small
+# and prevent secrets from leaking into the image.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Dependencies (reinstalled fresh inside the builder stage)
+node_modules/
+
+# Next.js build output and cache
+.next/
+out/
+build/
+
+# Local env overrides — secrets must be passed via docker-compose env vars
+.env
+.env*.local
+
+# Git & editor metadata
+.git/
+.gitignore
+.vscode/
+.prettierrc
+.prettierignore
+
+# AI agent config files
+AGENTS.md
+CLAUDE.md
+README.md
+
+# TypeScript build cache
+*.tsbuildinfo
+next-env.d.ts
+
+# OS artefacts
+.DS_Store
+*.pem
+npm-debug.*
+yarn-debug.*
+yarn-error.*
