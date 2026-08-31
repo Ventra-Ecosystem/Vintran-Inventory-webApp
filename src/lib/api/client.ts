@@ -10,7 +10,7 @@
  *  - On refresh failure tokens are cleared and an ApiError is thrown.
  */
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://152.53.108.33:5100';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '/api-proxy' : 'http://152.53.108.33:5100');
 
 // ─── Inlined token shape (breaks circular dep with auth.ts) ──────────────────
 interface AuthTokens {
