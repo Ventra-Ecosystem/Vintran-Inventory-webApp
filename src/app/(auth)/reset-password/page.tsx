@@ -20,6 +20,14 @@ function ResetPasswordForm() {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPasswordFocused, setNewPasswordFocused] = useState(false);
+
+  const PASSWORD_REQUIREMENTS: { label: string; test: (v: string) => boolean }[] = [
+    { label: 'At least 8 characters',     test: (v) => v.length >= 8 },
+    { label: 'One uppercase letter (A–Z)', test: (v) => /[A-Z]/.test(v) },
+    { label: 'One lowercase letter (a–z)', test: (v) => /[a-z]/.test(v) },
+    { label: 'One number (0–9)',           test: (v) => /[0-9]/.test(v) },
+  ];
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const passwordMismatch =
@@ -28,7 +36,8 @@ function ResetPasswordForm() {
   const canSubmit =
     email.trim() &&
     code.length === 6 &&
-    newPassword.length >= 6 &&
+    newPassword.length >= 8 &&
+    PASSWORD_REQUIREMENTS.every(({ test }) => test(newPassword)) &&
     newPassword === confirmPassword;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -82,15 +91,28 @@ function ResetPasswordForm() {
           />
         </div>
 
-        <Input
-          label="New password"
-          type="password"
-          placeholder="Minimum 6 characters"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          minLength={6}
-        />
+        <div className="space-y-1">
+          <Input
+            label="New password"
+            type="password"
+            placeholder="············"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            onFocus={() => setNewPasswordFocused(true)}
+            onBlur={() => setNewPasswordFocused(false)}
+            required
+          />
+          {newPasswordFocused && newPassword.length > 0 && (() => {
+            const next = PASSWORD_REQUIREMENTS.find(({ test }) => !test(newPassword));
+            if (!next) return null;
+            return (
+              <div className="flex items-center gap-1.5 pl-1">
+                <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] shrink-0 bg-red-50 text-red-500">✕</span>
+                <span className="text-xs text-red-500">{next.label}</span>
+              </div>
+            );
+          })()}
+        </div>
 
         <Input
           label="Confirm new password"
