@@ -16,7 +16,7 @@ export default function Verify2FaPage() {
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(300);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -64,7 +64,7 @@ export default function Verify2FaPage() {
     try {
       await authApi.resendVerifyOtp({ verifyToken });
       handleApiSuccess('A new 2FA verification code has been sent to your email.');
-      setCountdown(60);
+      setCountdown(300);
     } catch (err) {
       handleApiError(err, { fallback: 'Failed to resend 2FA code. Please try again.' });
     } finally {
@@ -88,19 +88,26 @@ export default function Verify2FaPage() {
           />
 
           <div className="text-center text-sm text-neutral-500">
-            Didn&apos;t receive code?{' '}
-            <button
-              type="button"
-              disabled={countdown > 0 || isResending}
-              onClick={handleResend}
-              className="font-medium text-brand hover:underline disabled:opacity-50 disabled:no-underline"
-            >
-              {isResending
-                ? 'Sending…'
-                : countdown > 0
-                ? `Resend in ${countdown}s`
-                : 'Resend OTP'}
-            </button>
+            {countdown > 0 ? (
+              <>
+                Resend code in{' '}
+                <span className="font-medium text-neutral-900">
+                  {`${Math.floor(countdown / 60).toString().padStart(2, '0')}:${(countdown % 60).toString().padStart(2, '0')}`}
+                </span>
+              </>
+            ) : (
+              <>
+                Didn&apos;t receive code?{' '}
+                <button
+                  type="button"
+                  disabled={isResending}
+                  onClick={handleResend}
+                  className="font-medium text-brand hover:underline disabled:opacity-50 disabled:no-underline"
+                >
+                  {isResending ? 'Sending…' : 'Resend OTP'}
+                </button>
+              </>
+            )}
           </div>
         </div>
 

@@ -57,7 +57,7 @@ export const authApi = {
   }) => apiClient.post<{ email: string; expiresOnUtc: string }>('/api/auth/account', body),
 
   verifyEmail: (body: { email: string; code: string }) =>
-    apiClient.post('/api/auth/account/verify-email', body),
+    apiClient.post<AuthTokens>('/api/auth/account/verify-email', body),
 
   resendOtp: (body: {
     email: string;

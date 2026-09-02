@@ -1,30 +1,50 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AuthLayout } from '@/src/components/auth/AuthLayout';
 import { OtpInput } from '@/src/components/ui/OtpInput';
 import { Button } from '@/src/components/ui/Button';
 import { authApi } from '@/src/lib/api/auth';
+import { useAuthStore } from '@/src/store/authStore';
 import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
+
+const COUNTDOWN_SECONDS = 5 * 60; // 5 minutes
+
+function formatCountdown(secs: number) {
+  const m = Math.floor(secs / 60).toString().padStart(2, '0');
+  const s = (secs % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
 
 function RegisterVerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') ?? '';
+  const { setTokens } = useAuthStore();
 
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCountdown = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setCountdown(COUNTDOWN_SECONDS);
+    timerRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(timerRef.current!); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+  };
 
   useEffect(() => {
-    if (countdown > 0) {
-      const timer = setInterval(() => setCountdown((c) => c - 1), 1000);
-      return () => clearInterval(timer);
-    }
-  }, [countdown]);
+    startCountdown();
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
 
   const handleVerify = async (otpCode: string) => {
     if (!email) {
@@ -32,20 +52,19 @@ function RegisterVerifyForm() {
       router.push('/register');
       return;
     }
-
     if (otpCode.length < 6) {
       handleApiError('Please enter the full 6-digit verification code.');
       return;
     }
 
     setIsSubmitting(true);
-
     try {
-      await authApi.verifyEmail({ email, code: otpCode });
-      handleApiSuccess('Email verified successfully! Please log in to your account.');
-      router.push('/login');
+      const res = await authApi.verifyEmail({ email, code: otpCode });
+      setTokens(res.data);
+      handleApiSuccess('Email verified! Welcome aboard.');
+      router.push(res.data.hasBusiness ? '/dashboard' : '/create-business');
     } catch (err) {
-      handleApiError(err, { fallback: 'Verification failed. Please check your OTP code.' });
+      handleApiError(err, { fallback: 'Verification failed. Please check your code.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -53,12 +72,11 @@ function RegisterVerifyForm() {
 
   const handleResendOtp = async () => {
     if (!email || countdown > 0 || isResending) return;
-
     setIsResending(true);
     try {
       await authApi.resendOtp({ email, purpose: 'EmailVerification' });
       handleApiSuccess('A new verification code has been sent to your email.');
-      setCountdown(60);
+      startCountdown();
     } catch (err) {
       handleApiError(err, { fallback: 'Failed to resend OTP. Please try again.' });
     } finally {
@@ -82,19 +100,24 @@ function RegisterVerifyForm() {
           />
 
           <div className="text-center text-sm text-neutral-500">
-            Didn&apos;t receive the code?{' '}
-            <button
-              type="button"
-              disabled={countdown > 0 || isResending}
-              onClick={handleResendOtp}
-              className="font-medium text-brand hover:underline disabled:opacity-50 disabled:no-underline"
-            >
-              {isResending
-                ? 'Sending…'
-                : countdown > 0
-                ? `Resend in ${countdown}s`
-                : 'Resend OTP'}
-            </button>
+            {countdown > 0 ? (
+              <>
+                Resend code in{' '}
+                <span className="font-medium text-neutral-900">{formatCountdown(countdown)}</span>
+              </>
+            ) : (
+              <>
+                Didn&apos;t receive the code?{' '}
+                <button
+                  type="button"
+                  disabled={isResending}
+                  onClick={handleResendOtp}
+                  className="font-medium text-brand hover:underline disabled:opacity-50 disabled:no-underline"
+                >
+                  {isResending ? 'Sending…' : 'Resend OTP'}
+                </button>
+              </>
+            )}
           </div>
         </div>
 

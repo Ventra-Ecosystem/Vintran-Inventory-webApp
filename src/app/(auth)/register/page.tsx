@@ -16,6 +16,14 @@ import {
 import { authApi } from '@/src/lib/api/auth';
 import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
 
+const PASSWORD_REQUIREMENTS = [
+  'At least 8 characters',
+  'At least one uppercase letter (A–Z)',
+  'At least one lowercase letter (a–z)',
+  'At least one number (0–9)',
+  'At least one special character (e.g. @, #, $)',
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,6 +31,7 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<RegisterFormValues>({
@@ -31,7 +40,6 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsSubmitting(true);
-
     try {
       await authApi.createAccount({
         firstName: data.firstName,
@@ -42,7 +50,6 @@ export default function RegisterPage() {
         confirmPassword: data.confirmPassword,
         referralCode: data.referralCode || undefined,
       });
-
       handleApiSuccess('Account created successfully! Please verify your email.');
       router.push(`/register/verify?email=${encodeURIComponent(data.email)}`);
     } catch (err) {
@@ -50,6 +57,18 @@ export default function RegisterPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Strip non-alpha characters for name fields
+  const handleNameInput = (field: 'firstName' | 'lastName') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '').slice(0, 24);
+    setValue(field, cleaned, { shouldValidate: true });
+  };
+
+  // Strip non-numeric characters for phone
+  const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+    setValue('phoneNumber', cleaned, { shouldValidate: true });
   };
 
   return (
@@ -64,14 +83,17 @@ export default function RegisterPage() {
             placeholder="First name"
             error={errors.firstName?.message}
             {...register('firstName')}
+            onChange={handleNameInput('firstName')}
           />
           <Input
             label="Last name"
             placeholder="Last name"
             error={errors.lastName?.message}
             {...register('lastName')}
+            onChange={handleNameInput('lastName')}
           />
         </div>
+
         <Input
           label="Email address"
           type="email"
@@ -79,35 +101,52 @@ export default function RegisterPage() {
           error={errors.email?.message}
           {...register('email')}
         />
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Phone number"
-            type="tel"
-            placeholder="+234 000 000 0000"
-            icon={<NigeriaIcon />}
-            error={errors.phoneNumber?.message}
-            {...register('phoneNumber')}
-          />
-          <Input
-            label="Referral code (optional)"
-            placeholder="Referral code"
-            error={errors.referralCode?.message}
-            {...register('referralCode')}
-          />
-        </div>
+
+        {/* Phone — flag only, no dropdown */}
         <Input
-          label="Password"
-          type="password"
-          placeholder="Minimum 6 characters"
-          error={errors.password?.message}
-          {...register('password')}
+          label="Phone number"
+          type="tel"
+          placeholder="08000000000"
+          icon={<NigeriaIcon />}
+          error={errors.phoneNumber?.message}
+          {...register('phoneNumber')}
+          onChange={handlePhoneInput}
+          maxLength={11}
         />
+
+        {/* Password with requirements shown upfront */}
+        <div>
+          <Input
+            label="Password"
+            type="password"
+            placeholder="············"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <ul className="mt-1.5 space-y-0.5 pl-1">
+            <li className="text-xs text-neutral-500 font-medium">Password must contain:</li>
+            {PASSWORD_REQUIREMENTS.map((req) => (
+              <li key={req} className="text-xs text-neutral-400 flex items-start gap-1">
+                <span>•</span> {req}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <Input
           label="Confirm password"
           type="password"
           placeholder="Re-enter your password"
           error={errors.confirmPassword?.message}
           {...register('confirmPassword')}
+        />
+
+        {/* Referral code — optional */}
+        <Input
+          label="Referral code (optional)"
+          placeholder="Enter referral code"
+          error={errors.referralCode?.message}
+          {...register('referralCode')}
         />
 
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
