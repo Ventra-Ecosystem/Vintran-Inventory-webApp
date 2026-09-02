@@ -33,11 +33,39 @@ export interface MeResponse {
   entitlements: Record<string, unknown>;
 }
 
+/** Returns a stable browser device ID stored in localStorage */
+function getWebDeviceId(): string {
+  if (typeof window === 'undefined') return 'web-ssr';
+  const key = 'vint-device-id';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = 'web-' + crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+/** Returns a human-readable browser/OS label */
+function getWebDeviceName(): string {
+  if (typeof window === 'undefined') return 'Web Browser';
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad/.test(ua)) return 'Safari on iOS';
+  if (/Android/.test(ua)) return 'Chrome on Android';
+  if (/Macintosh/.test(ua)) return 'Mac Browser';
+  if (/Windows/.test(ua)) return 'Windows Browser';
+  if (/Linux/.test(ua)) return 'Linux Browser';
+  return 'Web Browser';
+}
+
 export const authApi = {
   login: (body: { email: string; password: string }) =>
     apiClient.post<LoginResponse>('/api/auth/login', {
       ...body,
-      device: { deviceId: 'web', deviceName: 'Web Browser', deviceType: 1 }, // Web=1
+      device: {
+        deviceId: getWebDeviceId(),
+        deviceName: getWebDeviceName(),
+        deviceType: 1, // Web=1
+      },
     }),
 
   verify2FA: (body: { verifyToken: string; code: string }) =>
@@ -57,12 +85,22 @@ export const authApi = {
   }) => apiClient.post<{ email: string; expiresOnUtc: string }>('/api/auth/account', body),
 
   verifyEmail: (body: { email: string; code: string }) =>
-    apiClient.post<AuthTokens>('/api/auth/account/verify-email', body),
+    apiClient.post<AuthTokens>('/api/auth/account/verify-email', {
+      ...body,
+      device: {
+        deviceId: getWebDeviceId(),
+        deviceName: getWebDeviceName(),
+        deviceType: 1, // Web=1
+      },
+    }),
 
   resendOtp: (body: {
     email: string;
     purpose: 'EmailVerification' | 'PasswordReset' | 'TwoFactorEnable';
-  }) => apiClient.post('/api/auth/account/resend-otp', body),
+  }) => {
+    const purposeCode: Record<string, number> = { EmailVerification: 1, PasswordReset: 2, TwoFactorEnable: 3 };
+    return apiClient.post('/api/auth/account/resend-otp', { email: body.email, purpose: purposeCode[body.purpose] });
+  },
 
   forgotPassword: (body: { identifier: string }) =>
     apiClient.post('/api/auth/forgot-password', body),

@@ -10,7 +10,7 @@ import { authApi } from '@/src/lib/api/auth';
 import { useAuthStore } from '@/src/store/authStore';
 import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
 
-const COUNTDOWN_SECONDS = 5 * 60; // 5 minutes
+const COUNTDOWN_SECONDS = 5 * 60;
 
 function formatCountdown(secs: number) {
   const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -46,22 +46,14 @@ function RegisterVerifyForm() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
+  // Mirrors mobile exactly: POST { email, code } → receives AuthTokens → setTokens → route
   const handleVerify = async (otpCode: string) => {
-    if (!email) {
-      handleApiError('Email address missing. Please register again.');
-      router.push('/register');
-      return;
-    }
-    if (otpCode.length < 6) {
-      handleApiError('Please enter the full 6-digit verification code.');
-      return;
-    }
-
+    if (!email || otpCode.length < 6) return;
     setIsSubmitting(true);
     try {
       const res = await authApi.verifyEmail({ email, code: otpCode });
       setTokens(res.data);
-      handleApiSuccess('Email verified! Welcome aboard.');
+      handleApiSuccess('Email verified!');
       router.push(res.data.hasBusiness ? '/dashboard' : '/create-business');
     } catch (err) {
       handleApiError(err, { fallback: 'Verification failed. Please check your code.' });
@@ -70,15 +62,16 @@ function RegisterVerifyForm() {
     }
   };
 
-  const handleResendOtp = async () => {
+  const handleResend = async () => {
     if (!email || countdown > 0 || isResending) return;
     setIsResending(true);
     try {
       await authApi.resendOtp({ email, purpose: 'EmailVerification' });
-      handleApiSuccess('A new verification code has been sent to your email.');
+      handleApiSuccess('A new code has been sent to your email.');
+      setCode('');
       startCountdown();
     } catch (err) {
-      handleApiError(err, { fallback: 'Failed to resend OTP. Please try again.' });
+      handleApiError(err, { fallback: 'Could not resend code.' });
     } finally {
       setIsResending(false);
     }
@@ -87,7 +80,7 @@ function RegisterVerifyForm() {
   return (
     <AuthLayout
       title="Verify your email"
-      subtitle={`Enter the 6-digit code sent to ${email || 'your email address'}.`}
+      subtitle={`We sent a 6-digit code to ${email || 'your email address'}.`}
     >
       <div className="flex flex-col h-full justify-between py-2">
         <div className="space-y-6 flex flex-col items-center">
@@ -107,14 +100,14 @@ function RegisterVerifyForm() {
               </>
             ) : (
               <>
-                Didn&apos;t receive the code?{' '}
+                Didn&apos;t receive a code?{' '}
                 <button
                   type="button"
                   disabled={isResending}
-                  onClick={handleResendOtp}
+                  onClick={handleResend}
                   className="font-medium text-brand hover:underline disabled:opacity-50 disabled:no-underline"
                 >
-                  {isResending ? 'Sending…' : 'Resend OTP'}
+                  {isResending ? 'Sending…' : 'Resend'}
                 </button>
               </>
             )}

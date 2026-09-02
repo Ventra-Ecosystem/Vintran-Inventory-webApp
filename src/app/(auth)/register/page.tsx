@@ -17,11 +17,10 @@ import { authApi } from '@/src/lib/api/auth';
 import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
 
 const PASSWORD_REQUIREMENTS: { label: string; test: (v: string) => boolean }[] = [
-  { label: 'At least 8 characters',                   test: (v) => v.length >= 8 },
-  { label: 'One uppercase letter (A–Z)',               test: (v) => /[A-Z]/.test(v) },
-  { label: 'One lowercase letter (a–z)',               test: (v) => /[a-z]/.test(v) },
-  { label: 'One number (0–9)',                         test: (v) => /[0-9]/.test(v) },
-  { label: 'One special character (e.g. @, #, $)',     test: (v) => /[^a-zA-Z0-9]/.test(v) },
+  { label: 'At least 8 characters',       test: (v) => v.length >= 8 },
+  { label: 'One uppercase letter (A–Z)',   test: (v) => /[A-Z]/.test(v) },
+  { label: 'One lowercase letter (a–z)',   test: (v) => /[a-z]/.test(v) },
+  { label: 'One number (0–9)',             test: (v) => /[0-9]/.test(v) },
 ];
 
 export default function RegisterPage() {
