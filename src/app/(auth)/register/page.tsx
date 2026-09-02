@@ -16,17 +16,19 @@ import {
 import { authApi } from '@/src/lib/api/auth';
 import { handleApiError, handleApiSuccess } from '@/src/lib/utils/error-handler';
 
-const PASSWORD_REQUIREMENTS = [
-  'At least 8 characters',
-  'At least one uppercase letter (A–Z)',
-  'At least one lowercase letter (a–z)',
-  'At least one number (0–9)',
-  'At least one special character (e.g. @, #, $)',
+const PASSWORD_REQUIREMENTS: { label: string; test: (v: string) => boolean }[] = [
+  { label: 'At least 8 characters',                   test: (v) => v.length >= 8 },
+  { label: 'One uppercase letter (A–Z)',               test: (v) => /[A-Z]/.test(v) },
+  { label: 'One lowercase letter (a–z)',               test: (v) => /[a-z]/.test(v) },
+  { label: 'One number (0–9)',                         test: (v) => /[0-9]/.test(v) },
+  { label: 'One special character (e.g. @, #, $)',     test: (v) => /[^a-zA-Z0-9]/.test(v) },
 ];
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const {
     register,
@@ -114,7 +116,7 @@ export default function RegisterPage() {
           maxLength={11}
         />
 
-        {/* Password with requirements shown upfront */}
+        {/* Password with live requirement checklist */}
         <div>
           <Input
             label="Password"
@@ -122,15 +124,27 @@ export default function RegisterPage() {
             placeholder="············"
             error={errors.password?.message}
             {...register('password')}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              register('password').onChange(e);
+            }}
+            onFocus={() => setPasswordFocused(true)}
+            onBlur={(e) => {
+              setPasswordFocused(false);
+              register('password').onBlur(e);
+            }}
           />
-          <ul className="mt-1.5 space-y-0.5 pl-1">
-            <li className="text-xs text-neutral-500 font-medium">Password must contain:</li>
-            {PASSWORD_REQUIREMENTS.map((req) => (
-              <li key={req} className="text-xs text-neutral-400 flex items-start gap-1">
-                <span>•</span> {req}
-              </li>
-            ))}
-          </ul>
+          {passwordFocused && password.length > 0 && (() => {
+            // Show only the first unmet requirement — one at a time
+            const next = PASSWORD_REQUIREMENTS.find(({ test }) => !test(password));
+            if (!next) return null;
+            return (
+              <div className="mt-2 flex items-center gap-1.5 pl-1">
+                <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] shrink-0 bg-red-50 text-red-500">✕</span>
+                <span className="text-xs text-red-500">{next.label}</span>
+              </div>
+            );
+          })()}
         </div>
 
         <Input

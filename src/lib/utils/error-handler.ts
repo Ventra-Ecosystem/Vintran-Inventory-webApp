@@ -12,6 +12,16 @@ export function getErrorMessage(error: unknown, fallbackMessage = 'An unexpected
       return 'Network connection error. Please check your internet connection and try again.';
     }
 
+    // Always show a clean message for session/auth expiry — never leak raw server descriptions
+    if (
+      error.code === 'session_expired' ||
+      error.code === 'no_refresh_token' ||
+      error.type === 'Unauthorized' ||
+      error.status === 401
+    ) {
+      return 'Your session has expired. Please log in again to continue.';
+    }
+
     if (error.description) {
       return error.description;
     }
@@ -19,8 +29,6 @@ export function getErrorMessage(error: unknown, fallbackMessage = 'An unexpected
     switch (error.status) {
       case 400:
         return 'Invalid request details provided. Please check your input.';
-      case 401:
-        return 'Session expired. Please log in again to continue.';
       case 402:
         return 'Subscription required. Please upgrade your business plan to access this feature.';
       case 403:

@@ -125,7 +125,7 @@ async function performRefresh(): Promise<void> {
   if (!refreshToken) {
     clearStoredAuth();
     redirectToLogin();
-    throw new ApiError('no_refresh_token', 'Session expired. Please log in again.', 'Unauthorized', 401);
+    throw new ApiError('session_expired', 'Your session has expired. Please log in again.', 'Unauthorized', 401);
   }
 
   const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
@@ -147,9 +147,9 @@ async function performRefresh(): Promise<void> {
     clearStoredAuth();
     redirectToLogin();
     throw new ApiError(
-      json.error?.code ?? 'refresh_failed',
-      json.error?.description ?? 'Session expired. Please log in again.',
-      json.error?.type ?? 'Unauthorized',
+      'session_expired',
+      'Your session has expired. Please log in again.',
+      'Unauthorized',
       res.status,
     );
   }
@@ -223,7 +223,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
     if (!getRefreshToken()) {
       clearStoredAuth();
       redirectToLogin();
-      throw new ApiError('session_expired', 'Session expired. Please log in again.', 'Unauthorized', 401);
+      throw new ApiError('session_expired', 'Your session has expired. Please log in again.', 'Unauthorized', 401);
     }
 
     if (!refreshPromise) {
